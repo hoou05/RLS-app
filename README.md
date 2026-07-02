@@ -6,6 +6,7 @@ This is an MVP scaffold, not a clinical product. It is meant to prove that the b
 
 ## What Is Included
 
+- `site`: responsive hosted product page for GitHub Pages.
 - `services/api`: FastAPI backend, SQLModel schema, auth, wearable upload, questionnaire, prediction, reports, and tests.
 - `apps/web`: Vite React dashboard for registration/login, mock wearable sync, questionnaire/prediction flow, histories, model info, and a polished green RLS-themed UI.
 - `apps/mobile`: Flutter scaffold with login, consent, health permission, dashboard, questionnaire, result, history, mocked health-data sync, and a HealthKit/Health Connect interface boundary.
@@ -37,6 +38,21 @@ Prediction + latest report APIs
 ```
 
 ## Local Setup
+
+Hosted product page:
+
+```bash
+cd site
+python -m http.server 8080
+```
+
+Open:
+
+```text
+http://localhost:8080
+```
+
+GitHub Pages deployment is configured in `.github/workflows/pages.yml`.
 
 Backend:
 

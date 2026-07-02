@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="RLS Screen is a non-diagnostic MVP for Restless Legs Syndrome screening workflows using wearable-style data, questionnaires, and model-backed risk estimates."
+    />
+    <title>RLS Screen | Rest-aware Screening MVP</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <a class="brand" href="#top" aria-label="RLS Screen home">
+        <span class="logo-mark">
+          <span class="pulse">R</span>
+          <span class="leg-line"></span>
+        </span>
+        <span>
+          <strong>RLS Screen</strong>
+          <small>Rest-aware screening MVP</small>
+        </span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="#product">Product</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#debug">Debug</a>
+        <a href="#healthkit">HealthKit</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="motion-bg" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="hero-copy">
+          <p class="eyebrow">Non-diagnostic screening MVP</p>
+          <h1>Wearable-informed RLS risk screening, built for fast research iteration.</h1>
+          <p>
+            RLS Screen connects mock or normalized wearable data, symptom questionnaires, backend feature
+            aggregation, and model-backed risk estimates in one runnable monorepo.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/hoou05/RLS-app">View GitHub repo</a>
+            <a class="button secondary" href="#debug">Run locally</a>
+          </div>
+        </div>
+        <aside class="hero-card" aria-label="Latest MVP summary">
+          <div class="risk-card">
+            <div>
+              <span>Latest demo risk</span>
+              <strong>0.548</strong>
+              <em>Moderate estimate</em>
+            </div>
+            <div class="risk-scale"><span></span></div>
+          </div>
+          <div class="metric-grid">
+            <div>
+              <span>Sleep</span>
+              <strong>410 min</strong>
+            </div>
+            <div>
+              <span>Heart rate</span>
+              <strong>74 bpm</strong>
+            </div>
+            <div>
+              <span>Steps</span>
+              <strong>6200</strong>
+            </div>
+            <div>
+              <span>Source</span>
+              <strong>Mock</strong>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section id="product" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Product idea</p>
+          <h2>A focused MVP for RLS screening workflows</h2>
+          <p>
+            The current product is designed to test the full data and prediction loop before building a clinical-grade app.
+          </p>
+        </div>
+        <div class="cards three">
+          <article class="card">
+            <span class="card-icon">01</span>
+            <h3>Collect inputs</h3>
+            <p>Register a demo profile, sync mock wearable events, and submit symptom questionnaire payloads.</p>
+          </article>
+          <article class="card">
+            <span class="card-icon">02</span>
+            <h3>Normalize features</h3>
+            <p>Convert sleep, heart rate, steps, activity, and questionnaire data into backend daily features.</p>
+          </article>
+          <article class="card">
+            <span class="card-icon">03</span>
+            <h3>Estimate risk</h3>
+            <p>Run Tier 1 or Tier 2 prediction through a real-model adapter or deterministic fallback model.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="architecture" class="section split">
+        <div>
+          <p class="eyebrow">Architecture</p>
+          <h2>One monorepo, clear boundaries</h2>
+          <p>
+            The scaffold separates frontend experience, mobile health-data integration, backend APIs, database models,
+            and model inference. This keeps HealthKit work independent from backend prediction logic.
+          </p>
+          <ul class="check-list">
+            <li>FastAPI + SQLModel backend</li>
+            <li>React web dashboard</li>
+            <li>Flutter mobile scaffold</li>
+            <li>SQLite locally and PostgreSQL in Docker</li>
+            <li>XGBoost/TabM adapter with fallback inference</li>
+          </ul>
+        </div>
+        <div class="flow-panel" aria-label="Architecture flow">
+          <div>Web / Flutter</div>
+          <span></span>
+          <div>FastAPI APIs</div>
+          <span></span>
+          <div>Database + feature aggregation</div>
+          <span></span>
+          <div>Model adapter or fallback</div>
+          <span></span>
+          <div>Latest report</div>
+        </div>
+      </section>
+
+      <section id="debug" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Debug environment</p>
+          <h2>Run the full MVP loop locally</h2>
+          <p>Use the virtual debug environment to validate backend, web, mock wearable data, questionnaire, and prediction.</p>
+        </div>
+        <div class="code-grid">
+          <article class="code-card">
+            <h3>Backend</h3>
+            <pre><code>cd services/api
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload</code></pre>
+          </article>
+          <article class="code-card">
+            <h3>Web</h3>
+            <pre><code>cd apps/web
+npm install
+npm run dev</code></pre>
+          </article>
+          <article class="code-card">
+            <h3>Validate</h3>
+            <pre><code>cd services/api
+pytest
+
+cd apps/web
+npm run build</code></pre>
+          </article>
+        </div>
+      </section>
+
+      <section id="healthkit" class="section split healthkit">
+        <div>
+          <p class="eyebrow">Health data roadmap</p>
+          <h2>HealthKit integration is intentionally isolated</h2>
+          <p>
+            The backend upload API is ready. The mobile app currently uses a mock HealthDataService, so a collaborator can
+            add Apple HealthKit reads without touching model or report logic.
+          </p>
+        </div>
+        <div class="handoff">
+          <h3>Collaborator scope</h3>
+          <ul>
+            <li>Request Apple HealthKit permissions</li>
+            <li>Read sleep, heart rate, resting heart rate, steps, and activity minutes</li>
+            <li>Normalize records into wearable events</li>
+            <li>Upload to <code>POST /wearable/upload</code></li>
+            <li>Keep mock sync available for local development</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="brand">
+        <span class="logo-mark small">
+          <span class="pulse">R</span>
+          <span class="leg-line"></span>
+        </span>
+        <span>
+          <strong>RLS Screen</strong>
+          <small>research-ops@rls-screen.local</small>
+        </span>
+      </div>
+      <p>Screening only. This MVP does not diagnose RLS or determine whether a user has RLS.</p>
+    </footer>
+  </body>
+</html>
