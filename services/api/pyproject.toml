@@ -1,0 +1,34 @@
+[project]
+name = "rls-screening-api"
+version = "0.1.0"
+description = "FastAPI MVP backend for RLS screening risk estimates."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.111.0",
+  "uvicorn[standard]>=0.30.0",
+  "sqlmodel>=0.0.21",
+  "pydantic-settings>=2.3.0",
+  "email-validator>=2.1.0",
+  "python-jose[cryptography]>=3.3.0",
+  "python-multipart>=0.0.9",
+  "psycopg[binary]>=3.2.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.2.0",
+  "httpx>=0.27.0",
+]
+model = [
+  "numpy>=1.26.0",
+  "pandas>=2.2.0",
+  "scipy>=1.12.0",
+  "scikit-learn>=1.4.0",
+  "xgboost>=2.0.0",
+  "torch>=2.2.0",
+  "tabm>=0.0.4",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["app/tests"]
