@@ -1,6 +1,7 @@
 .DS_Store
 .env
 .venv/
+.conda/
 __pycache__/
 .pytest_cache/
 *.pyc
@@ -11,6 +12,11 @@ dist/
 .vite/
 
 .dart_tool/
+.build/
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
+
+*.xcuserstate
+xcuserdata/
+.swiftpm/xcode/xcuserdata/

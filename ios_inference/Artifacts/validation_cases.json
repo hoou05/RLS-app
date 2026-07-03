@@ -1,0 +1,64 @@
+[
+  {
+    "name": "tier1_demo",
+    "tier": "tier1",
+    "features": {
+      "sleep_duration_minutes": 405,
+      "sleep_efficiency": 80,
+      "mean_heart_rate": 78,
+      "resting_heart_rate": 69,
+      "age": 51,
+      "sex": "female",
+      "height": 165,
+      "weight": 62
+    },
+    "expected_probability": 0.4553466376239051,
+    "expected_xgboost_probability": 0.9650438453591065,
+    "expected_tabm_probability": 0.46130818128585815,
+    "model_version": "sleep_heart_basic__apple-xgb-tabm-v2"
+  },
+  {
+    "name": "tier2_demo",
+    "tier": "tier2",
+    "features": {
+      "sleep_duration_minutes": 405,
+      "sleep_efficiency": 80,
+      "mean_heart_rate": 78,
+      "resting_heart_rate": 69,
+      "age": 51,
+      "sex": "female",
+      "height": 165,
+      "weight": 62,
+      "family_history_rls": true,
+      "diabetes": false,
+      "psychiatric_medication": false,
+      "non_leg_symptoms": null
+    },
+    "expected_probability": 0.5667035397035354,
+    "expected_xgboost_probability": 0.9987657571053854,
+    "expected_tabm_probability": 0.5922216773033142,
+    "model_version": "sleep_heart_basic_q__apple-xgb-tabm-v2"
+  },
+  {
+    "name": "tier2_higher_signal",
+    "tier": "tier2",
+    "features": {
+      "sleep_duration_minutes": 360,
+      "sleep_efficiency": 72,
+      "mean_heart_rate": 86,
+      "resting_heart_rate": 76,
+      "age": 64,
+      "sex": "female",
+      "height": 165,
+      "weight": 62,
+      "family_history_rls": true,
+      "diabetes": true,
+      "psychiatric_medication": false,
+      "non_leg_symptoms": true
+    },
+    "expected_probability": 0.6289898026280882,
+    "expected_xgboost_probability": 0.9989119318910143,
+    "expected_tabm_probability": 0.6700809001922607,
+    "model_version": "sleep_heart_basic_q__apple-xgb-tabm-v2"
+  }
+]
