@@ -35,12 +35,24 @@ def upload(payload: WearableUploadRequest, current_user: CurrentUser, session: S
             )
         ).first()
         if existing:
+            existing.bed_time = feature.bed_time
+            existing.wake_time = feature.wake_time
             existing.sleep_duration_minutes = feature.sleep_duration_minutes
+            existing.time_in_bed_minutes = feature.time_in_bed_minutes
             existing.sleep_efficiency = feature.sleep_efficiency
+            existing.sleep_latency_minutes = feature.sleep_latency_minutes
+            existing.night_awakenings = feature.night_awakenings
             existing.resting_heart_rate = feature.resting_heart_rate
             existing.mean_heart_rate = feature.mean_heart_rate
+            existing.hrv = feature.hrv
             existing.step_count = feature.step_count
             existing.activity_minutes = feature.activity_minutes
+            existing.daytime_sleepiness_score = feature.daytime_sleepiness_score
+            existing.rls_symptom_score = feature.rls_symptom_score
+            existing.caffeine_evening = feature.caffeine_evening
+            existing.alcohol_evening = feature.alcohol_evening
+            existing.exercise = feature.exercise
+            existing.notes = feature.notes
             existing.missing_mask_json = feature.missing_mask_json
             existing.created_at = utcnow()
             session.add(existing)

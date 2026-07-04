@@ -1,0 +1,6 @@
+- template_id: boundary_disclaimer_basic
+  category: medical_boundary
+  condition: general
+  applies_to_modes: [trend, guide, question]
+  text: >
+    This guidance is for sleep-health education and trend observation only. It cannot diagnose disease or replace a clinician's judgment.

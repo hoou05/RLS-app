@@ -1,16 +1,19 @@
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Activity, ArrowRight, ClipboardList, Database, HeartPulse, Info, LineChart, LucideIcon, Moon, ShieldCheck, Upload } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, Bot, ClipboardList, Database, HeartPulse, Info, LineChart, LucideIcon, MessageCircle, Moon, Send, ShieldCheck, Upload, X } from "lucide-react";
 import "./styles.css";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
-type Tab = "dashboard" | "predictions" | "questionnaires" | "upload" | "model";
+type Tab = "dashboard" | "agent" | "predictions" | "questionnaires" | "upload" | "model";
 type Screen = "login" | "register" | "app";
 type ApiState = { token?: string; latest?: any; predictions: any[]; questionnaires: any[]; features: any[] };
 type MessageKind = "info" | "success" | "error";
+type AgentMode = "trend" | "guide" | "question";
+type AgentChatMessage = { role: "user" | "assistant"; text: string; meta?: string };
 const navItems: Array<[Tab, LucideIcon, string]> = [
   ["dashboard", Activity, "Dashboard"],
+  ["agent", Bot, "Sleep agent"],
   ["predictions", LineChart, "Prediction history"],
   ["questionnaires", ClipboardList, "Questionnaires"],
   ["upload", Upload, "Upload/debug"],
@@ -30,6 +33,17 @@ function App() {
   const [messageKind, setMessageKind] = useState<MessageKind>("info");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [state, setState] = useState<ApiState>({ predictions: [], questionnaires: [], features: [] });
+  const [agentQuestion, setAgentQuestion] = useState("Could my night leg discomfort be Restleg / RLS?");
+  const [agentReply, setAgentReply] = useState<any | null>(null);
+  const [agentUseExternal, setAgentUseExternal] = useState(false);
+  const [widgetOpen, setWidgetOpen] = useState(false);
+  const [chatHistory, setChatHistory] = useState<AgentChatMessage[]>([
+    {
+      role: "assistant",
+      text: "Ask about sleep trends, sleep hygiene, RLS-style symptoms, insomnia, or possible sleep apnea warning signs.",
+      meta: "Sleep agent",
+    },
+  ]);
 
   const isAuthenticated = Boolean(state.token);
   const authLabel = isAuthenticated ? "Authorized" : "Not signed in";
@@ -180,6 +194,39 @@ function App() {
     });
   }
 
+  async function runSleepAgent(mode: AgentMode, surface: "panel" | "widget" = "panel") {
+    if (mode === "question" && surface === "widget") {
+      setChatHistory((items) => [...items, { role: "user", text: agentQuestion }]);
+    }
+    await runAction(`agent-${mode}`, async () => {
+      const reply = await api("/agent/sleep", {
+        method: "POST",
+        body: JSON.stringify({
+          mode,
+          question: mode === "question" ? agentQuestion : undefined,
+          include_latest_data: true,
+          allow_external_model: agentUseExternal,
+        }),
+      });
+      setAgentReply(reply);
+      if (surface === "panel") {
+        setTab("agent");
+      } else {
+        setWidgetOpen(true);
+        setChatHistory((items) => [
+          ...items,
+          {
+            role: "assistant",
+            text: reply.answer,
+            meta: `${reply.provider}${reply.external_model_used ? " • structured explanation layer" : ""}`,
+          },
+        ]);
+      }
+      setMessageKind("success");
+      setMessage(`Sleep agent answered with ${reply.provider}.`);
+    });
+  }
+
   async function runAction(name: string, action: () => Promise<void>) {
     setBusyAction(name);
     setMessageKind("info");
@@ -281,6 +328,74 @@ function App() {
             <Metric title="Data source" value="Mock" caption="HealthKit / Health Connect TODO" />
           </div>
         )}
+        {tab === "agent" && (
+          <section className="agent-layout">
+            <div className="panel agent-panel">
+              <div className="agent-heading">
+                <Bot size={24} />
+                <div>
+                  <h2>Sleep agent debug</h2>
+                  <p>Trend review, conservative guidance, and bounded sleep-health Q&A on top of your current structured data.</p>
+                </div>
+              </div>
+              <label className="agent-toggle">
+                <input type="checkbox" checked={agentUseExternal} onChange={(event) => setAgentUseExternal(event.target.checked)} />
+                <span>Use DeepSeek explanation layer only from structured summaries</span>
+              </label>
+              <p className="agent-boundary-note">
+                When enabled, the backend still sends only trend summaries, selected templates, screening summaries, and safety flags.
+              </p>
+              <div className="agent-actions">
+                <button onClick={() => runSleepAgent("trend")} disabled={!isAuthenticated || busyAction !== null}>
+                  Analyze trend
+                </button>
+                <button onClick={() => runSleepAgent("guide")} disabled={!isAuthenticated || busyAction !== null}>
+                  Sleep guide
+                </button>
+              </div>
+              <label className="agent-question">
+                Question
+                <textarea value={agentQuestion} onChange={(event) => setAgentQuestion(event.target.value)} rows={4} />
+              </label>
+              <button className="agent-send" onClick={() => runSleepAgent("question")} disabled={!isAuthenticated || busyAction !== null}>
+                <Send size={17} />
+                {busyAction === "agent-question" ? "Asking..." : "Ask agent"}
+              </button>
+            </div>
+            <div className="panel agent-response">
+              <h2>Agent response</h2>
+              {agentReply ? (
+                <>
+                  <p className="agent-answer">{agentReply.answer}</p>
+                  <div className="agent-meta">
+                    <span>Provider: {agentReply.provider}</span>
+                    <span>Planner: {agentReply.planner_provider}</span>
+                    <span>HITL: {agentReply.hitl_required ? "yes" : "no"}</span>
+                    <span>External model: {agentReply.external_model_used ? "yes" : "no"}</span>
+                    <span>Data: {agentReply.data_used?.join(", ")}</span>
+                  </div>
+                  {agentReply.external_model_error && (
+                    <p className="agent-error-note">{agentReply.external_model_error}</p>
+                  )}
+                  <PlanPanel reply={agentReply} />
+                  <TrendSnapshot reply={agentReply} />
+                  <TemplateList reply={agentReply} />
+                  <ScreeningPanel reply={agentReply} />
+                  <FlagPanel title="Red flags" items={agentReply.red_flags} emptyLabel="No immediate red-flag signals surfaced from the current question and notes." />
+                  <KnowledgePanel reply={agentReply} />
+                  <ToolTracePanel reply={agentReply} />
+                  <FlagPanel title="Guide points" items={agentReply.guide_points} emptyLabel="No guide points selected yet." />
+                  <h3>Safety limits</h3>
+                  <ul>{agentReply.safety_limits?.map((point: string) => <li key={point}>{point}</li>)}</ul>
+                  <h3>Knowledge sources</h3>
+                  <ul>{agentReply.knowledge_sources?.map((point: string) => <li key={point}>{point}</li>)}</ul>
+                </>
+              ) : (
+                <p className="agent-empty">Run a trend, guide, or question check to see the agent output here.</p>
+              )}
+            </div>
+          </section>
+        )}
         {tab === "predictions" && <JsonList title="Prediction history" items={state.predictions} />}
         {tab === "questionnaires" && <JsonList title="Questionnaire history" items={state.questionnaires} />}
         {tab === "upload" && <JsonList title="Latest daily features" items={state.features} />}
@@ -299,6 +414,48 @@ function App() {
             <span>Local MVP logs: browser console + FastAPI terminal</span>
           </div>
         </footer>
+        <button className="agent-fab" onClick={() => setWidgetOpen((value) => !value)} aria-label="Open sleep agent">
+          {widgetOpen ? <X size={20} /> : <MessageCircle size={20} />}
+          <span>Sleep agent</span>
+        </button>
+        {widgetOpen && (
+          <section className="agent-widget panel">
+            <div className="agent-widget-header">
+              <div>
+                <strong>Sleep agent</strong>
+                <p>Quick Q&A, trend checks, and safe sleep guidance.</p>
+              </div>
+              <button className="agent-widget-close" onClick={() => setWidgetOpen(false)} aria-label="Close sleep agent">
+                <X size={18} />
+              </button>
+            </div>
+            <label className="agent-toggle compact">
+              <input type="checkbox" checked={agentUseExternal} onChange={(event) => setAgentUseExternal(event.target.checked)} />
+              <span>DeepSeek explanation layer</span>
+            </label>
+            <div className="agent-chat-log">
+              {chatHistory.map((item, index) => (
+                <div className={`agent-bubble ${item.role}`} key={`${item.role}-${index}-${item.text.slice(0, 24)}`}>
+                  {item.meta && <small>{item.meta}</small>}
+                  <p>{item.text}</p>
+                </div>
+              ))}
+            </div>
+            <label className="agent-question compact">
+              Ask now
+              <textarea value={agentQuestion} onChange={(event) => setAgentQuestion(event.target.value)} rows={3} />
+            </label>
+            <div className="agent-widget-actions">
+              <button onClick={() => runSleepAgent("trend", "widget")} disabled={!isAuthenticated || busyAction !== null}>
+                Trend
+              </button>
+              <button onClick={() => runSleepAgent("question", "widget")} disabled={!isAuthenticated || busyAction !== null}>
+                <Send size={16} />
+                Ask
+              </button>
+            </div>
+          </section>
+        )}
       </section>
     </main>
   );
@@ -468,6 +625,141 @@ function JsonList({ title, items }: { title: string; items: any[] }) {
   return <section className="panel wide"><h2>{title}</h2><pre>{JSON.stringify(items, null, 2)}</pre></section>;
 }
 
+function PlanPanel({ reply }: { reply: any }) {
+  const plan = reply?.plan;
+  if (!plan) return null;
+  return (
+    <div className="agent-plan-card">
+      <div className="agent-screening-head">
+        <Bot size={18} />
+        <div>
+          <strong>{plan.intent}</strong>
+          <span>{plan.topic} • HITL {plan.hitl_required ? "required" : "not required"}</span>
+        </div>
+      </div>
+      <p>{plan.rationale}</p>
+      <FlagPanel title="Planned tools" items={plan.tool_sequence} emptyLabel="No tools were planned." />
+    </div>
+  );
+}
+
+function TrendSnapshot({ reply }: { reply: any }) {
+  const trend = reply?.trend_summary;
+  if (!trend) return null;
+  const minutesOrEmpty = (value: number | null | undefined) => value === null || value === undefined ? "--" : `${value} min`;
+  const valueOrEmpty = (value: number | string | null | undefined) => value === null || value === undefined ? "--" : `${value}`;
+  const cards = [
+    ["Avg sleep 7d", minutesOrEmpty(trend.avg_sleep_7d)],
+    ["Prev 7d", minutesOrEmpty(trend.avg_sleep_prev_7d)],
+    ["Change", minutesOrEmpty(trend.sleep_duration_change)],
+    ["Efficiency 7d", valueOrEmpty(trend.avg_sleep_efficiency_7d)],
+    ["Bedtime var", minutesOrEmpty(trend.bedtime_variability_minutes)],
+    ["RLS nights", `${trend.rls_symptom_nights ?? 0}`],
+  ];
+  return (
+    <>
+      <h3>Trend snapshot</h3>
+      <div className="agent-stats-grid">
+        {cards.map(([label, value]) => (
+          <div className="agent-stat-card" key={label}>
+            <small>{label}</small>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+      <FlagPanel title="Risk flags" items={trend.risk_flags} emptyLabel="No sleep-health warning flags were generated from the current 14-day summary." />
+    </>
+  );
+}
+
+function ToolTracePanel({ reply }: { reply: any }) {
+  const trace = reply?.tool_trace ?? [];
+  if (!trace.length) return null;
+  return (
+    <>
+      <h3>Tool trace</h3>
+      <div className="agent-template-list">
+        {trace.map((item: any) => (
+          <div className="agent-template-card" key={`${item.tool_name}-${item.summary}`}>
+            <small>{item.status}</small>
+            <strong>{item.tool_name}</strong>
+            <p>{item.summary}</p>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function KnowledgePanel({ reply }: { reply: any }) {
+  const snippets = reply?.knowledge_snippets ?? [];
+  if (!snippets.length) return null;
+  return (
+    <>
+      <h3>Knowledge snippets</h3>
+      <div className="agent-template-list">
+        {snippets.map((item: any) => (
+          <div className="agent-template-card" key={`${item.source}-${item.snippet}`}>
+            <small>{item.source}</small>
+            <strong>{item.intended_use}</strong>
+            <p>{item.snippet}</p>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function TemplateList({ reply }: { reply: any }) {
+  const templates = reply?.selected_templates ?? [];
+  if (!templates.length) return null;
+  return (
+    <>
+      <h3>Selected education templates</h3>
+      <div className="agent-template-list">
+        {templates.map((item: any) => (
+          <div className="agent-template-card" key={item.template_id}>
+            <small>{item.category}</small>
+            <strong>{item.template_id}</strong>
+            <p>{item.text}</p>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function ScreeningPanel({ reply }: { reply: any }) {
+  const screening = reply?.rls_screening;
+  if (!screening) return null;
+  return (
+    <div className="agent-screening-card">
+      <div className="agent-screening-head">
+        <ClipboardList size={18} />
+        <div>
+          <strong>RLS educational screening</strong>
+          <span>{screening.status}</span>
+        </div>
+      </div>
+      <p>{screening.explanation}</p>
+      <FlagPanel title="Matched features" items={screening.matched_features} emptyLabel="No specific RLS-style features were matched." />
+    </div>
+  );
+}
+
+function FlagPanel({ title, items, emptyLabel }: { title: string; items?: string[]; emptyLabel: string }) {
+  return (
+    <>
+      <h3>{title}</h3>
+      {items && items.length ? (
+        <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul>
+      ) : (
+        <p className="agent-empty with-icon"><AlertTriangle size={15} />{emptyLabel}</p>
+      )}
+    </>
+  );
+}
+
 async function formatApiError(response: Response) {
   let detail = response.statusText;
   try {
@@ -484,7 +776,7 @@ async function formatApiError(response: Response) {
   }
   if (response.status === 409) return `${detail}. Try Login instead.`;
   if (response.status === 401) return `${detail}. Check your email/password or login again.`;
-  if (response.status === 0) return "Cannot reach the backend. Make sure FastAPI is running on http://localhost:8000.";
+  if (response.status === 0) return "Cannot reach the backend. Make sure FastAPI is running on http://127.0.0.1:8000.";
   return `HTTP ${response.status}: ${detail}`;
 }
 
@@ -495,6 +787,9 @@ function labelForAction(action: string) {
     sync: "Syncing mock health data",
     predict: "Submitting questionnaire and running prediction",
     refresh: "Refreshing dashboard",
+    "agent-trend": "Asking sleep agent for trend analysis",
+    "agent-guide": "Asking sleep agent for guide points",
+    "agent-question": "Asking sleep agent",
   };
   return labels[action] ?? "Working";
 }

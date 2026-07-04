@@ -47,12 +47,24 @@ class DailyFeature(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     date: dt_date = Field(index=True)
+    bed_time: str | None = None
+    wake_time: str | None = None
     sleep_duration_minutes: float | None = None
+    time_in_bed_minutes: float | None = None
     sleep_efficiency: float | None = None
+    sleep_latency_minutes: float | None = None
+    night_awakenings: int | None = None
     resting_heart_rate: float | None = None
     mean_heart_rate: float | None = None
+    hrv: float | None = None
     step_count: int | None = None
     activity_minutes: float | None = None
+    daytime_sleepiness_score: int | None = None
+    rls_symptom_score: int | None = None
+    caffeine_evening: bool | None = None
+    alcohol_evening: bool | None = None
+    exercise: bool | None = None
+    notes: str | None = None
     missing_mask_json: dict[str, bool] = Field(default_factory=dict, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=utcnow)
 

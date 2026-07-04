@@ -1,0 +1,7 @@
+- template_id: insomnia_behavioral_basic
+  category: insomnia_education
+  condition: insomnia
+  applies_to_modes: [guide, question]
+  text: >
+    For persistent insomnia symptoms, behavioral approaches such as CBT-I are evidence-based options,
+    but whether they fit your situation should be assessed with a qualified clinician.

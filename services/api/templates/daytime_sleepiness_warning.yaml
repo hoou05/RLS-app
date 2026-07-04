@@ -1,0 +1,6 @@
+- template_id: daytime_sleepiness_warning_basic
+  category: daytime_sleepiness_warning
+  condition: general
+  applies_to_modes: [trend, question]
+  text: >
+    Marked daytime sleepiness, especially if it affects concentration, work, school, or driving, deserves more urgent medical follow-up rather than watchful waiting alone.

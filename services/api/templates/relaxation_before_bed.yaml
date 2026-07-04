@@ -1,0 +1,6 @@
+- template_id: relaxation_before_bed_basic
+  category: relaxation_before_bed
+  condition: general
+  applies_to_modes: [guide, question]
+  text: >
+    A brief wind-down routine such as gentle stretching, relaxed breathing, a warm shower, or quiet reading can help create a clearer transition into sleep.

@@ -1,0 +1,6 @@
+- template_id: trend_summary_short_sleep
+  category: trend_summary
+  condition: general
+  applies_to_modes: [trend]
+  text: >
+    The recent pattern suggests that sleep duration or regularity may have drifted away from a steadier baseline, so schedule stabilization is a sensible first target.

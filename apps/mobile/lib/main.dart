@@ -54,6 +54,7 @@ class _ShellPageState extends State<ShellPage> {
       ),
       const QuestionnairePage(),
       RiskResultPage(result: result),
+      const SleepAgentPage(),
       const HistoryPage(),
     ];
     return Scaffold(
@@ -67,6 +68,13 @@ class _ShellPageState extends State<ShellPage> {
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => setState(() => index = 6),
+        icon: const Icon(Icons.chat_bubble_outline),
+        label: const Text('Agent'),
+        backgroundColor: leaf,
+        foregroundColor: Colors.white,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (value) => setState(() => index = value),
@@ -78,6 +86,7 @@ class _ShellPageState extends State<ShellPage> {
           NavigationDestination(icon: Icon(Icons.dashboard), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.checklist), label: 'Survey'),
           NavigationDestination(icon: Icon(Icons.insights), label: 'Result'),
+          NavigationDestination(icon: Icon(Icons.smart_toy), label: 'Agent'),
           NavigationDestination(icon: Icon(Icons.history), label: 'History'),
         ],
       ),
@@ -428,6 +437,64 @@ class RiskResultPage extends StatelessWidget {
         title: 'Risk result',
         subtitle: 'Screening output for local validation only.',
         child: Text('$result\n\nThis is a screening result, not a diagnosis. Consult a clinician if symptoms persist.'),
+      );
+}
+
+class SleepAgentPage extends StatefulWidget {
+  const SleepAgentPage({super.key});
+
+  @override
+  State<SleepAgentPage> createState() => _SleepAgentPageState();
+}
+
+class _SleepAgentPageState extends State<SleepAgentPage> {
+  final controller = TextEditingController(text: 'Can I take iron or change medication for restless legs?');
+  String response = 'Ask a sleep-health question. This local mobile preview uses the same safety posture as the FastAPI agent.';
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  void answer() {
+    final question = controller.text.toLowerCase();
+    setState(() {
+      if (question.contains('iron') || question.contains('medication') || question.contains('cpap') || question.contains('dose')) {
+        response = 'I cannot diagnose, recommend medication or iron, change medication, or adjust CPAP settings. I can help track symptoms and suggest when to contact a clinician or sleep specialist.';
+      } else if (question.contains('rls') || question.contains('leg')) {
+        response = 'RLS-like education focuses on whether symptoms appear at rest, worsen at night, improve with movement, and affect sleep. This is education only, not a diagnosis.';
+      } else {
+        response = 'Focus on regular wake time, a stable sleep window, reduced evening caffeine or alcohol, daytime movement, and a quiet cool sleep environment.';
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => PageFrame(
+        title: 'Sleep agent',
+        subtitle: 'Mobile safety preview for trend education and bounded Q&A.',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Question', filled: true),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: answer,
+                icon: const Icon(Icons.send),
+                label: const Text('Ask local preview'),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(response, style: const TextStyle(height: 1.45)),
+          ],
+        ),
       );
 }
 
