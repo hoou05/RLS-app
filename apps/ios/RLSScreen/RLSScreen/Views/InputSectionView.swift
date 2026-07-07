@@ -203,25 +203,25 @@ struct InputSectionView: View {
 
             GroupBox("Questionnaire") {
                 VStack(spacing: 8) {
-                    ToggleRow(
+                    TernaryQuestionRow(
                         title: "Family history",
                         help: "Whether RLS has been reported or diagnosed in close family members.",
-                        isOn: $form.familyHistoryRLS
+                        value: $form.familyHistoryRLS
                     )
-                    ToggleRow(
+                    TernaryQuestionRow(
                         title: "Diabetes",
                         help: "Whether diabetes is part of the user's known medical history.",
-                        isOn: $form.diabetes
+                        value: $form.diabetes
                     )
-                    ToggleRow(
+                    TernaryQuestionRow(
                         title: "Psychiatric medication",
                         help: "Whether psychiatric medication use is present, as represented in the experiment feature set.",
-                        isOn: $form.psychiatricMedication
+                        value: $form.psychiatricMedication
                     )
-                    ToggleRow(
+                    TernaryQuestionRow(
                         title: "Non-leg symptoms",
                         help: "Whether symptoms involve body areas beyond the legs.",
-                        isOn: $form.nonLegSymptoms
+                        value: $form.nonLegSymptoms
                     )
                 }
             }
@@ -296,14 +296,55 @@ private struct OptionalNumberField: View {
     }
 }
 
-private struct ToggleRow: View {
+private struct TernaryQuestionRow: View {
     let title: String
     let help: String
-    @Binding var isOn: Bool
+    @Binding var value: Bool?
 
     var body: some View {
-        Toggle(isOn: $isOn) {
+        VStack(alignment: .leading, spacing: 8) {
             FieldTitle(title: title, help: help)
+            Picker(title, selection: selection) {
+                Text("Unknown").tag(QuestionnaireChoice.unknown)
+                Text("No").tag(QuestionnaireChoice.no)
+                Text("Yes").tag(QuestionnaireChoice.yes)
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+
+    private var selection: Binding<QuestionnaireChoice> {
+        Binding(
+            get: { QuestionnaireChoice(value) },
+            set: { value = $0.boolValue }
+        )
+    }
+}
+
+private enum QuestionnaireChoice: Hashable {
+    case unknown
+    case no
+    case yes
+
+    init(_ value: Bool?) {
+        switch value {
+        case true:
+            self = .yes
+        case false:
+            self = .no
+        case nil:
+            self = .unknown
+        }
+    }
+
+    var boolValue: Bool? {
+        switch self {
+        case .unknown:
+            return nil
+        case .no:
+            return false
+        case .yes:
+            return true
         }
     }
 }

@@ -23,10 +23,10 @@ struct ScreeningForm: Codable, Equatable {
     var sex = "female"
     var heightCm = 165.0
     var weightKg = 62.0
-    var familyHistoryRLS = true
-    var diabetes = false
-    var psychiatricMedication = false
-    var nonLegSymptoms = false
+    var familyHistoryRLS: Bool?
+    var diabetes: Bool?
+    var psychiatricMedication: Bool?
+    var nonLegSymptoms: Bool?
 
     var featureInput: RLSFeatureInput {
         RLSFeatureInput(
