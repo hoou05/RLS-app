@@ -3,8 +3,8 @@ import RLSInference
 
 struct ScreeningForm: Codable, Equatable {
     var sleepSessionEndDate: Date?
-    var sleepDurationMinutes = 405.0
-    var sleepEfficiency = 80.0
+    var sleepDurationMinutes: Double?
+    var sleepEfficiency: Double?
     var wasoMinutes: Double?
     var sleepLatencyMinutes: Double?
     var remLatencyMinutes: Double?
@@ -17,12 +17,12 @@ struct ScreeningForm: Codable, Equatable {
     var deepSleepPercent: Double?
     var remSleepMinutes: Double?
     var remSleepPercent: Double?
-    var restingHeartRate = 69.0
-    var meanHeartRate = 78.0
-    var age = 51.0
-    var sex = "female"
-    var heightCm = 165.0
-    var weightKg = 62.0
+    var restingHeartRate: Double?
+    var meanHeartRate: Double?
+    var age: Double?
+    var sex: String?
+    var heightCm: Double?
+    var weightKg: Double?
     var familyHistoryRLS: Bool?
     var diabetes: Bool?
     var psychiatricMedication: Bool?

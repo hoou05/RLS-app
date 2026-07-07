@@ -30,7 +30,7 @@ struct InputSectionView: View {
         VStack(spacing: 16) {
             GroupBox("Wearable Signals") {
                 VStack(spacing: 12) {
-                    NumberField(
+                    OptionalNumberField(
                         title: "Sleep duration",
                         unit: "min",
                         help: "Total time asleep in the latest major sleep session.",
@@ -38,7 +38,7 @@ struct InputSectionView: View {
                         field: .sleepDuration,
                         focusedField: focusedField
                     )
-                    NumberField(
+                    OptionalNumberField(
                         title: "Sleep efficiency",
                         unit: "%",
                         help: "Percent of the sleep window spent asleep.",
@@ -46,7 +46,7 @@ struct InputSectionView: View {
                         field: .sleepEfficiency,
                         focusedField: focusedField
                     )
-                    NumberField(
+                    OptionalNumberField(
                         title: "Resting heart rate",
                         unit: "bpm",
                         help: "Most recent resting heart rate available from Health.",
@@ -54,7 +54,7 @@ struct InputSectionView: View {
                         field: .restingHeartRate,
                         focusedField: focusedField
                     )
-                    NumberField(
+                    OptionalNumberField(
                         title: "Mean heart rate",
                         unit: "bpm",
                         help: "Average heart rate over the recent wearable window.",
@@ -168,13 +168,17 @@ struct InputSectionView: View {
 
             GroupBox("Profile") {
                 VStack(spacing: 12) {
-                    Picker("Sex", selection: $form.sex) {
-                        Text("Female").tag("female")
-                        Text("Male").tag("male")
+                    VStack(alignment: .leading, spacing: 8) {
+                        FieldTitle(title: "Sex", help: "Biological sex from Health or manual entry. Unknown is treated as missing by the model.")
+                        Picker("Sex", selection: sexSelection) {
+                            Text("Unknown").tag(SexChoice.unknown)
+                            Text("Female").tag(SexChoice.female)
+                            Text("Male").tag(SexChoice.male)
+                        }
+                        .pickerStyle(.segmented)
                     }
-                    .pickerStyle(.segmented)
 
-                    NumberField(
+                    OptionalNumberField(
                         title: "Age",
                         unit: "yr",
                         help: "Age in years, imported from Health date of birth when available.",
@@ -182,7 +186,7 @@ struct InputSectionView: View {
                         field: .age,
                         focusedField: focusedField
                     )
-                    NumberField(
+                    OptionalNumberField(
                         title: "Height",
                         unit: "cm",
                         help: "Height used with weight to derive BMI for models that include body profile features.",
@@ -190,7 +194,7 @@ struct InputSectionView: View {
                         field: .height,
                         focusedField: focusedField
                     )
-                    NumberField(
+                    OptionalNumberField(
                         title: "Weight",
                         unit: "kg",
                         help: "Weight used with height to derive BMI for models that include body profile features.",
@@ -226,6 +230,13 @@ struct InputSectionView: View {
                 }
             }
         }
+    }
+
+    private var sexSelection: Binding<SexChoice> {
+        Binding(
+            get: { SexChoice(form.sex) },
+            set: { form.sex = $0.rawValue }
+        )
     }
 }
 
@@ -345,6 +356,34 @@ private enum QuestionnaireChoice: Hashable {
             return false
         case .yes:
             return true
+        }
+    }
+}
+
+private enum SexChoice: Hashable {
+    case unknown
+    case female
+    case male
+
+    init(_ value: String?) {
+        switch value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "female", "f", "woman", "女", "0":
+            self = .female
+        case "male", "m", "man", "男", "1":
+            self = .male
+        default:
+            self = .unknown
+        }
+    }
+
+    var rawValue: String? {
+        switch self {
+        case .unknown:
+            return nil
+        case .female:
+            return "female"
+        case .male:
+            return "male"
         }
     }
 }
