@@ -21,6 +21,7 @@
 		0A000001000000000000000C /* RLSInference in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000010000000000000502 /* RLSInference */; };
 		0A000001000000000000000D /* Models/NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010E /* Models/NotificationManager.swift */; };
 		0A000001000000000000000E /* Models/BackgroundRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010F /* Models/BackgroundRefreshCoordinator.swift */; };
+		0A000001000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000111 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		0A000001000000000000010E /* Models/NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/NotificationManager.swift; sourceTree = "<group>"; };
 		0A000001000000000000010F /* Models/BackgroundRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/BackgroundRefreshCoordinator.swift; sourceTree = "<group>"; };
 		0A0000010000000000000110 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		0A0000010000000000000111 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +70,7 @@
 				0A0000010000000000000101 /* RLSScreenApp.swift */,
 				0A000001000000000000010D /* RLSScreen.entitlements */,
 				0A0000010000000000000110 /* Info.plist */,
+				0A0000010000000000000111 /* Assets.xcassets */,
 				0A0000010000000000000304 /* Models */,
 				0A0000010000000000000305 /* Views */,
 				0A0000010000000000000306 /* Resources */,
@@ -189,6 +192,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0A000001000000000000000B /* Resources/RLSModelBundle.json in Resources */,
+				0A000001000000000000000F /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -334,6 +338,7 @@
 		0A0000010000000000000803 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = RLSScreen/RLSScreen.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -358,6 +363,7 @@
 		0A0000010000000000000804 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = RLSScreen/RLSScreen.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
