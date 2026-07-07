@@ -33,12 +33,12 @@ final class ScreeningStore: ObservableObject {
         }
         do {
             let tier1 = try engine.predict(form.featureInput, tier: .tier1)
-            let tier2 = try engine.predict(form.featureInput, tier: .tier2)
+            let selected = try engine.predictBestAvailable(form.featureInput)
             let tier1Record = ScreeningRecord(prediction: tier1, input: form)
-            let tier2Record = ScreeningRecord(prediction: tier2, input: form)
+            let selectedRecord = ScreeningRecord(prediction: selected, input: form)
             latestTier1 = tier1Record
-            latestTier2 = tier2Record
-            history.insert(tier2Record, at: 0)
+            latestTier2 = selectedRecord
+            history.insert(selectedRecord, at: 0)
             history = Array(history.prefix(30))
             saveHistory()
         } catch {

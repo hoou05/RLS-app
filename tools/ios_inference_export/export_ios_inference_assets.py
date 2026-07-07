@@ -22,8 +22,15 @@ from app.services.rls_experiments_adapter import RLSExperimentModelAdapter  # no
 
 
 SCENARIOS = {
-    "tier1": "sleep_heart_basic__apple",
-    "tier2": "sleep_heart_basic_q__apple",
+    "sleep": "sleep__apple",
+    "sleep_heart": "sleep_heart__apple",
+    "sleep_heart_basic": "sleep_heart_basic__apple",
+    "sleep_heart_basic_q": "sleep_heart_basic_q__apple",
+}
+
+LEGACY_TIER_SCENARIOS = {
+    "tier1": "sleep_heart_basic",
+    "tier2": "sleep_heart_basic_q",
 }
 
 
@@ -246,7 +253,7 @@ def write_validation(artifact_root: Path, output_dir: Path) -> None:
     rows = []
     for name, features in validation_inputs().items():
         tier = "tier1" if name.startswith("tier1") else "tier2"
-        scenario_dir = artifact_root / "rls_experiments" / SCENARIOS[tier]
+        scenario_dir = artifact_root / "rls_experiments" / SCENARIOS[LEGACY_TIER_SCENARIOS[tier]]
         meta = json.loads((scenario_dir / "meta.json").read_text(encoding="utf-8"))
         adapter = RLSExperimentModelAdapter(scenario_dir)
         internal = adapter.to_experiment_features(features)

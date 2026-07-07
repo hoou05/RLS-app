@@ -95,14 +95,26 @@ def _artifact_predict(model: Any, features: dict[str, Any], tier: str) -> tuple[
     if isinstance(model, object) and model.__class__.__name__ == "RLSExperimentModelAdapter":
         score = model.predict_proba(features)
         meta = getattr(model, "meta", None) or {}
+        internal = model.to_experiment_features(features)
+        total_features = len(meta.get("features", []))
+        available_features = sum(
+            1
+            for feature in meta.get("features", [])
+            if isinstance(internal.get(feature), int | float)
+            and internal.get(feature) == internal.get(feature)
+            and internal.get(feature) not in {float("inf"), float("-inf")}
+        )
         return score, {
             "mode": "rls_experiments_xgb_tabm_adapter",
             "scenario": meta.get("scenario"),
+            "scope": meta.get("scope"),
             "resolution": meta.get("resolution"),
             "train_prevalence": meta.get("train_prevalence"),
             "prevalence_adjusted": getattr(model, "apply_prevalence_adjustment", None),
             "population_prevalence": getattr(model, "population_prevalence", None),
             "feature_projection": "mvp_schema_to_rls_experiment_features_v1",
+            "available_model_features": available_features,
+            "total_model_features": total_features,
         }
     ordered = TIER2_FIELDS if tier == "tier2" else TIER1_FIELDS
     vector = [[features.get(field) for field in ordered]]
@@ -124,7 +136,7 @@ def predict_tier2(payload: Tier2FeatureInput) -> PredictionResponse:
 
 
 def _predict(features: dict[str, Any], tier: str) -> PredictionResponse:
-    model = model_registry.load(tier)
+    model = model_registry.load_best(features, tier)
     using_fallback = model is None
     if using_fallback:
         score, explanation = _fallback_score(features, tier)

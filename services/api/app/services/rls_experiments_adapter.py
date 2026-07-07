@@ -32,6 +32,13 @@ def _to_binary(value: Any) -> float:
     return float("nan")
 
 
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
 def _adjust_prevalence(p_model: float, train_prev: float, pop_prev: float) -> float:
     if p_model <= 0 or p_model >= 1:
         return p_model
@@ -207,6 +214,18 @@ class RLSExperimentModelAdapter:
         internal = {
             "总睡眠时间/分": _to_float(feature_dict.get("sleep_duration_minutes")),
             "睡眠效率%": _to_float(feature_dict.get("sleep_efficiency")),
+            "WASO/分 入睡后清醒时间": _to_float(feature_dict.get("waso_minutes")),
+            "睡眠潜伏期/分": _to_float(feature_dict.get("sleep_latency_minutes")),
+            "REM睡眠潜伏期/分": _to_float(feature_dict.get("rem_latency_minutes")),
+            "W期时间": _to_float(feature_dict.get("awake_stage_minutes")),
+            "睡眠平均SPO2": _to_float(_first_present(feature_dict.get("average_spo2"), feature_dict.get("average_spo2_percent"))),
+            "睡眠最低SPO2": _to_float(_first_present(feature_dict.get("minimum_spo2"), feature_dict.get("minimum_spo2_percent"))),
+            "N1N2时间": _to_float(_first_present(feature_dict.get("light_sleep_minutes"), feature_dict.get("n1n2_minutes"))),
+            "N1N2%": _to_float(_first_present(feature_dict.get("light_sleep_percent"), feature_dict.get("n1n2_percent"))),
+            "N3时间": _to_float(_first_present(feature_dict.get("deep_sleep_minutes"), feature_dict.get("n3_minutes"))),
+            "N3%": _to_float(_first_present(feature_dict.get("deep_sleep_percent"), feature_dict.get("n3_percent"))),
+            "R期时间": _to_float(_first_present(feature_dict.get("rem_sleep_minutes"), feature_dict.get("r_minutes"))),
+            "R%": _to_float(_first_present(feature_dict.get("rem_sleep_percent"), feature_dict.get("r_percent"))),
             "平均心率": mean_hr,
             "平均-最慢心率差值": avg_minus_min,
             "最快-平均心率差值": max_minus_avg,

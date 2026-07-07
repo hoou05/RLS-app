@@ -4,6 +4,18 @@ import RLSInference
 struct ScreeningForm: Codable, Equatable {
     var sleepDurationMinutes = 405.0
     var sleepEfficiency = 80.0
+    var wasoMinutes: Double?
+    var sleepLatencyMinutes: Double?
+    var remLatencyMinutes: Double?
+    var awakeStageMinutes: Double?
+    var averageSpO2: Double?
+    var minimumSpO2: Double?
+    var lightSleepMinutes: Double?
+    var lightSleepPercent: Double?
+    var deepSleepMinutes: Double?
+    var deepSleepPercent: Double?
+    var remSleepMinutes: Double?
+    var remSleepPercent: Double?
     var restingHeartRate = 69.0
     var meanHeartRate = 78.0
     var age = 51.0
@@ -19,6 +31,18 @@ struct ScreeningForm: Codable, Equatable {
         RLSFeatureInput(
             sleepDurationMinutes: sleepDurationMinutes,
             sleepEfficiency: sleepEfficiency,
+            wasoMinutes: wasoMinutes,
+            sleepLatencyMinutes: sleepLatencyMinutes,
+            remLatencyMinutes: remLatencyMinutes,
+            awakeStageMinutes: awakeStageMinutes,
+            averageSpO2: averageSpO2,
+            minimumSpO2: minimumSpO2,
+            lightSleepMinutes: lightSleepMinutes,
+            lightSleepPercent: lightSleepPercent,
+            deepSleepMinutes: deepSleepMinutes,
+            deepSleepPercent: deepSleepPercent,
+            remSleepMinutes: remSleepMinutes,
+            remSleepPercent: remSleepPercent,
             restingHeartRate: restingHeartRate,
             meanHeartRate: meanHeartRate,
             age: age,
@@ -41,7 +65,10 @@ struct ScreeningRecord: Codable, Identifiable, Equatable {
     let riskLevel: String
     let xgboostProbability: Double
     let tabmProbability: Double
+    let modelKey: String?
     let scenario: String
+    let availableFeatureCount: Int?
+    let totalFeatureCount: Int?
     let input: ScreeningForm
 
     init(prediction: RLSPrediction, input: ScreeningForm) {
@@ -52,7 +79,10 @@ struct ScreeningRecord: Codable, Identifiable, Equatable {
         self.riskLevel = RiskLevel(score: prediction.riskScore).rawValue
         self.xgboostProbability = prediction.xgboostProbability
         self.tabmProbability = prediction.tabmProbability ?? .nan
+        self.modelKey = prediction.modelKey
         self.scenario = prediction.scenario
+        self.availableFeatureCount = prediction.availableFeatureCount
+        self.totalFeatureCount = prediction.totalFeatureCount
         self.input = input
     }
 }
@@ -83,4 +113,3 @@ enum RiskLevel: String {
         }
     }
 }
-

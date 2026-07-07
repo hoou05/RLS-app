@@ -53,4 +53,20 @@ struct ScenarioModel: Decodable {
         }
         return transformed
     }
+
+    func availableFeatureCount(from projected: [String: Double]) -> Int {
+        features.reduce(0) { count, feature in
+            guard let value = projected[feature], value.isFinite else {
+                return count
+            }
+            return count + 1
+        }
+    }
+
+    func featureCoverage(from projected: [String: Double]) -> Double {
+        guard !features.isEmpty else {
+            return 0
+        }
+        return Double(availableFeatureCount(from: projected)) / Double(features.count)
+    }
 }

@@ -12,6 +12,18 @@ public enum RLSTier: String, Codable, Sendable {
 public struct RLSFeatureInput: Sendable {
     public var sleepDurationMinutes: Double?
     public var sleepEfficiency: Double?
+    public var wasoMinutes: Double?
+    public var sleepLatencyMinutes: Double?
+    public var remLatencyMinutes: Double?
+    public var awakeStageMinutes: Double?
+    public var averageSpO2: Double?
+    public var minimumSpO2: Double?
+    public var lightSleepMinutes: Double?
+    public var lightSleepPercent: Double?
+    public var deepSleepMinutes: Double?
+    public var deepSleepPercent: Double?
+    public var remSleepMinutes: Double?
+    public var remSleepPercent: Double?
     public var restingHeartRate: Double?
     public var meanHeartRate: Double?
     public var minHeartRate: Double?
@@ -29,6 +41,18 @@ public struct RLSFeatureInput: Sendable {
     public init(
         sleepDurationMinutes: Double? = nil,
         sleepEfficiency: Double? = nil,
+        wasoMinutes: Double? = nil,
+        sleepLatencyMinutes: Double? = nil,
+        remLatencyMinutes: Double? = nil,
+        awakeStageMinutes: Double? = nil,
+        averageSpO2: Double? = nil,
+        minimumSpO2: Double? = nil,
+        lightSleepMinutes: Double? = nil,
+        lightSleepPercent: Double? = nil,
+        deepSleepMinutes: Double? = nil,
+        deepSleepPercent: Double? = nil,
+        remSleepMinutes: Double? = nil,
+        remSleepPercent: Double? = nil,
         restingHeartRate: Double? = nil,
         meanHeartRate: Double? = nil,
         minHeartRate: Double? = nil,
@@ -45,6 +69,18 @@ public struct RLSFeatureInput: Sendable {
     ) {
         self.sleepDurationMinutes = sleepDurationMinutes
         self.sleepEfficiency = sleepEfficiency
+        self.wasoMinutes = wasoMinutes
+        self.sleepLatencyMinutes = sleepLatencyMinutes
+        self.remLatencyMinutes = remLatencyMinutes
+        self.awakeStageMinutes = awakeStageMinutes
+        self.averageSpO2 = averageSpO2
+        self.minimumSpO2 = minimumSpO2
+        self.lightSleepMinutes = lightSleepMinutes
+        self.lightSleepPercent = lightSleepPercent
+        self.deepSleepMinutes = deepSleepMinutes
+        self.deepSleepPercent = deepSleepPercent
+        self.remSleepMinutes = remSleepMinutes
+        self.remSleepPercent = remSleepPercent
         self.restingHeartRate = restingHeartRate
         self.meanHeartRate = meanHeartRate
         self.minHeartRate = minHeartRate
@@ -66,8 +102,11 @@ public struct RLSPrediction: Sendable {
     public let xgboostProbability: Double
     public let tabmProbability: Double?
     public let tier: RLSTier
+    public let modelKey: String
     public let scenario: String
     public let prevalenceAdjusted: Bool
+    public let availableFeatureCount: Int
+    public let totalFeatureCount: Int
 }
 
 public final class RLSInferenceEngine {
@@ -79,10 +118,44 @@ public final class RLSInferenceEngine {
     }
 
     public func predict(_ input: RLSFeatureInput, tier: RLSTier) throws -> RLSPrediction {
-        guard let scenario = bundle.tiers[tier.rawValue] else {
+        let modelKey = Self.modelKey(for: tier)
+        guard let scenario = bundle.tiers[modelKey] ?? bundle.tiers[tier.rawValue] else {
             throw RLSInferenceError.missingTier(tier.rawValue)
         }
         let projected = FeatureProjector.project(input)
+        return try predict(input, tier: tier, modelKey: modelKey, scenario: scenario, projected: projected)
+    }
+
+    public func predictBestAvailable(_ input: RLSFeatureInput) throws -> RLSPrediction {
+        let projected = FeatureProjector.project(input)
+        guard let selected = bundle.tiers
+            .map({ (key: $0.key, scenario: $0.value) })
+            .max(by: { lhs, rhs in
+                let lhsAvailable = lhs.scenario.availableFeatureCount(from: projected)
+                let rhsAvailable = rhs.scenario.availableFeatureCount(from: projected)
+                if lhsAvailable != rhsAvailable {
+                    return lhsAvailable < rhsAvailable
+                }
+                let lhsCoverage = lhs.scenario.featureCoverage(from: projected)
+                let rhsCoverage = rhs.scenario.featureCoverage(from: projected)
+                if lhsCoverage != rhsCoverage {
+                    return lhsCoverage < rhsCoverage
+                }
+                return lhs.scenario.features.count > rhs.scenario.features.count
+            }) else {
+            throw RLSInferenceError.missingTier("auto")
+        }
+        let tier: RLSTier = selected.key == Self.modelKey(for: .tier2) ? .tier2 : .tier1
+        return try predict(input, tier: tier, modelKey: selected.key, scenario: selected.scenario, projected: projected)
+    }
+
+    private func predict(
+        _ input: RLSFeatureInput,
+        tier: RLSTier,
+        modelKey: String,
+        scenario: ScenarioModel,
+        projected: [String: Double]
+    ) throws -> RLSPrediction {
         let xgbInput = scenario.features.map { projected[$0] ?? .nan }
         let xgbProbability = XGBoostEnsemble(models: scenario.xgboostModels).predictProbability(xgbInput)
 
@@ -97,9 +170,21 @@ public final class RLSInferenceEngine {
             xgboostProbability: xgbProbability,
             tabmProbability: tabmProbability,
             tier: tier,
+            modelKey: modelKey,
             scenario: scenario.scenario,
-            prevalenceAdjusted: scenario.applyPrevalenceAdjustment
+            prevalenceAdjusted: scenario.applyPrevalenceAdjustment,
+            availableFeatureCount: scenario.availableFeatureCount(from: projected),
+            totalFeatureCount: scenario.features.count
         )
+    }
+
+    private static func modelKey(for tier: RLSTier) -> String {
+        switch tier {
+        case .tier1:
+            return "sleep_heart_basic"
+        case .tier2:
+            return "sleep_heart_basic_q"
+        }
     }
 
     static func adjustPrevalence(_ modelProbability: Double, trainPrevalence: Double, populationPrevalence: Double) -> Double {
@@ -143,6 +228,18 @@ private struct FeatureProjector {
         var output: [String: Double] = [
             "总睡眠时间/分": input.sleepDurationMinutes ?? .nan,
             "睡眠效率%": input.sleepEfficiency ?? .nan,
+            "WASO/分 入睡后清醒时间": input.wasoMinutes ?? .nan,
+            "睡眠潜伏期/分": input.sleepLatencyMinutes ?? .nan,
+            "REM睡眠潜伏期/分": input.remLatencyMinutes ?? .nan,
+            "W期时间": input.awakeStageMinutes ?? .nan,
+            "睡眠平均SPO2": input.averageSpO2 ?? .nan,
+            "睡眠最低SPO2": input.minimumSpO2 ?? .nan,
+            "N1N2时间": input.lightSleepMinutes ?? .nan,
+            "N1N2%": input.lightSleepPercent ?? .nan,
+            "N3时间": input.deepSleepMinutes ?? .nan,
+            "N3%": input.deepSleepPercent ?? .nan,
+            "R期时间": input.remSleepMinutes ?? .nan,
+            "R%": input.remSleepPercent ?? .nan,
             "平均心率": meanHR,
             "平均-最慢心率差值": averageMinusMin,
             "最快-平均心率差值": maxMinusAverage,

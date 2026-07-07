@@ -108,7 +108,7 @@ private struct ResultSummaryView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(level.title)
                         .font(.system(size: 34, weight: .bold))
-                    Text("Tier 2 local ensemble")
+                    Text(record.modelLabel)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -124,6 +124,12 @@ private struct ResultSummaryView: View {
             HStack(spacing: 10) {
                 MetricPill(title: "XGBoost", value: record.xgboostProbability)
                 MetricPill(title: "TabM", value: record.tabmProbability)
+            }
+
+            if let coverage = record.coverageLabel {
+                Label(coverage, systemImage: "checklist.checked")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
 
             Text("Screening only. Consult a clinician if symptoms persist or concern you.")
@@ -142,6 +148,22 @@ private struct ResultSummaryView: View {
         case .high:
             return .red
         }
+    }
+}
+
+private extension ScreeningRecord {
+    var modelLabel: String {
+        if let modelKey {
+            return "Auto model: \(modelKey)"
+        }
+        return scenario
+    }
+
+    var coverageLabel: String? {
+        guard let availableFeatureCount, let totalFeatureCount, totalFeatureCount > 0 else {
+            return nil
+        }
+        return "\(availableFeatureCount) of \(totalFeatureCount) model features available"
     }
 }
 

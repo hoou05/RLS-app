@@ -53,6 +53,7 @@ final class HealthKitDataProvider: HealthDataProvider {
         [
             HKQuantityTypeIdentifier.heartRate,
             .restingHeartRate,
+            .oxygenSaturation,
             .height,
             .bodyMass,
         ].compactMap { HKObjectType.quantityType(forIdentifier: $0) }
@@ -98,6 +99,28 @@ final class HealthKitDataProvider: HealthDataProvider {
                 imported.append("Sleep efficiency")
             } else {
                 missing.append("Sleep efficiency")
+            }
+            form.wasoMinutes = sleep.wasoMinutes
+            form.sleepLatencyMinutes = sleep.sleepLatencyMinutes
+            form.remLatencyMinutes = sleep.remLatencyMinutes
+            form.awakeStageMinutes = sleep.awakeStageMinutes
+            form.lightSleepMinutes = sleep.lightSleepMinutes
+            form.lightSleepPercent = sleep.lightSleepPercent
+            form.deepSleepMinutes = sleep.deepSleepMinutes
+            form.deepSleepPercent = sleep.deepSleepPercent
+            form.remSleepMinutes = sleep.remSleepMinutes
+            form.remSleepPercent = sleep.remSleepPercent
+            if sleep.hasStaging {
+                imported.append("Sleep stages")
+            } else {
+                missing.append("Sleep stages")
+            }
+            if let oxygen = try await oxygenSummary(start: sleep.startDate, end: sleep.endDate) {
+                form.averageSpO2 = oxygen.average
+                form.minimumSpO2 = oxygen.minimum
+                imported.append("Blood oxygen")
+            } else {
+                missing.append("Blood oxygen")
             }
         } else {
             missing.append("Sleep")
@@ -223,6 +246,35 @@ final class HealthKitDataProvider: HealthDataProvider {
         }
     }
 
+    private func oxygenSummary(start: Date, end: Date) async throws -> (average: Double, minimum: Double)? {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation) else {
+            return nil
+        }
+
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [.strictStartDate, .strictEndDate])
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: [.discreteAverage, .discreteMin]) { _, statistics, error in
+                if let error {
+                    if Self.isNoDataError(error) {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard
+                    let average = statistics?.averageQuantity()?.doubleValue(for: .percent()),
+                    let minimum = statistics?.minimumQuantity()?.doubleValue(for: .percent())
+                else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: (Self.normalizeSpO2(average), Self.normalizeSpO2(minimum)))
+            }
+            healthStore.execute(query)
+        }
+    }
+
     private func latestSleepSummary() async throws -> SleepSummary? {
         let end = Date()
         let start = end.addingTimeInterval(-14 * 86_400)
@@ -256,6 +308,20 @@ final class HealthKitDataProvider: HealthDataProvider {
         let endDate: Date
         let sleepDurationMinutes: Double
         let sleepEfficiency: Double?
+        let wasoMinutes: Double?
+        let sleepLatencyMinutes: Double?
+        let remLatencyMinutes: Double?
+        let awakeStageMinutes: Double?
+        let lightSleepMinutes: Double?
+        let lightSleepPercent: Double?
+        let deepSleepMinutes: Double?
+        let deepSleepPercent: Double?
+        let remSleepMinutes: Double?
+        let remSleepPercent: Double?
+
+        var hasStaging: Bool {
+            lightSleepMinutes != nil || deepSleepMinutes != nil || remSleepMinutes != nil
+        }
     }
 
     private static var shortDateTimeFormatter: DateFormatter = {
@@ -283,7 +349,9 @@ final class HealthKitDataProvider: HealthDataProvider {
     }
 
     private static func isSleepSessionValue(_ value: Int) -> Bool {
-        value == HKCategoryValueSleepAnalysis.inBed.rawValue || isAsleepValue(value)
+        value == HKCategoryValueSleepAnalysis.inBed.rawValue
+            || value == HKCategoryValueSleepAnalysis.awake.rawValue
+            || isAsleepValue(value)
     }
 
     private static func latestMajorSleepSession(from samples: [HKCategorySample]) -> SleepSummary? {
@@ -336,6 +404,33 @@ final class HealthKitDataProvider: HealthDataProvider {
             }
             return DateInterval(start: sample.startDate, end: sample.endDate)
         }
+        let awakeIntervals = samples.compactMap { sample -> DateInterval? in
+            guard sample.value == HKCategoryValueSleepAnalysis.awake.rawValue else {
+                return nil
+            }
+            return DateInterval(start: sample.startDate, end: sample.endDate)
+        }
+        let lightIntervals = samples.compactMap { sample -> DateInterval? in
+            guard [
+                HKCategoryValueSleepAnalysis.asleepCore.rawValue,
+                HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,
+            ].contains(sample.value) else {
+                return nil
+            }
+            return DateInterval(start: sample.startDate, end: sample.endDate)
+        }
+        let deepIntervals = samples.compactMap { sample -> DateInterval? in
+            guard sample.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue else {
+                return nil
+            }
+            return DateInterval(start: sample.startDate, end: sample.endDate)
+        }
+        let remIntervals = samples.compactMap { sample -> DateInterval? in
+            guard sample.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue else {
+                return nil
+            }
+            return DateInterval(start: sample.startDate, end: sample.endDate)
+        }
 
         let asleepSeconds = unionDuration(of: asleepIntervals)
         guard asleepSeconds >= 60 * 60 else {
@@ -348,13 +443,50 @@ final class HealthKitDataProvider: HealthDataProvider {
         let sessionSeconds = max(sessionEnd.timeIntervalSince(sessionStart), 1)
         let denominator = inBedSeconds > 0 ? inBedSeconds : sessionSeconds
         let efficiency = min(100.0, max(0.0, asleepSeconds / denominator * 100.0))
+        let firstAsleepStart = asleepIntervals.map(\.start).min()
+        let lastAsleepEnd = asleepIntervals.map(\.end).max()
+        let firstREMStart = remIntervals.map(\.start).min()
+        let wasoWindow = firstAsleepStart.flatMap { start in
+            lastAsleepEnd.map { end in DateInterval(start: start, end: max(start, end)) }
+        }
+        let wasoSeconds = wasoWindow.map { unionDuration(of: clippedIntervals(awakeIntervals, to: $0)) }
+        let lightSeconds = unionDuration(of: lightIntervals)
+        let deepSeconds = unionDuration(of: deepIntervals)
+        let remSeconds = unionDuration(of: remIntervals)
 
         return SleepSummary(
             startDate: sessionStart,
             endDate: sessionEnd,
             sleepDurationMinutes: asleepSeconds / 60.0,
-            sleepEfficiency: efficiency
+            sleepEfficiency: efficiency,
+            wasoMinutes: wasoSeconds.map { $0 / 60.0 },
+            sleepLatencyMinutes: firstAsleepStart.map { max(0.0, $0.timeIntervalSince(sessionStart) / 60.0) },
+            remLatencyMinutes: firstAsleepStart.flatMap { sleepStart in
+                firstREMStart.map { max(0.0, $0.timeIntervalSince(sleepStart) / 60.0) }
+            },
+            awakeStageMinutes: awakeIntervals.isEmpty ? nil : unionDuration(of: awakeIntervals) / 60.0,
+            lightSleepMinutes: lightSeconds > 0 ? lightSeconds / 60.0 : nil,
+            lightSleepPercent: lightSeconds > 0 ? lightSeconds / asleepSeconds * 100.0 : nil,
+            deepSleepMinutes: deepSeconds > 0 ? deepSeconds / 60.0 : nil,
+            deepSleepPercent: deepSeconds > 0 ? deepSeconds / asleepSeconds * 100.0 : nil,
+            remSleepMinutes: remSeconds > 0 ? remSeconds / 60.0 : nil,
+            remSleepPercent: remSeconds > 0 ? remSeconds / asleepSeconds * 100.0 : nil
         )
+    }
+
+    private static func normalizeSpO2(_ value: Double) -> Double {
+        value <= 1.5 ? value * 100.0 : value
+    }
+
+    private static func clippedIntervals(_ intervals: [DateInterval], to window: DateInterval) -> [DateInterval] {
+        intervals.compactMap { interval in
+            let start = max(interval.start, window.start)
+            let end = min(interval.end, window.end)
+            guard end > start else {
+                return nil
+            }
+            return DateInterval(start: start, end: end)
+        }
     }
 
     private static func unionDuration(of intervals: [DateInterval]) -> TimeInterval {
