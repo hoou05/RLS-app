@@ -1,5 +1,6 @@
 import Foundation
 import HealthKit
+import UIKit
 
 struct HealthDataImportResult: Equatable {
     var form: ScreeningForm
@@ -11,6 +12,7 @@ struct HealthDataImportResult: Equatable {
 protocol HealthDataProvider {
     func requestAuthorization() async throws
     func latestScreeningForm(current: ScreeningForm) async throws -> HealthDataImportResult
+    func startSleepDataObservation(onUpdate: @escaping @Sendable () async -> Void) async throws
 }
 
 struct ManualOnlyHealthDataProvider: HealthDataProvider {
@@ -19,6 +21,8 @@ struct ManualOnlyHealthDataProvider: HealthDataProvider {
     func latestScreeningForm(current: ScreeningForm) async throws -> HealthDataImportResult {
         HealthDataImportResult(form: current, importedFieldNames: [], missingFieldNames: [], notes: [])
     }
+
+    func startSleepDataObservation(onUpdate: @escaping @Sendable () async -> Void) async throws {}
 }
 
 enum HealthDataProviderError: LocalizedError {
@@ -38,6 +42,7 @@ enum HealthDataProviderError: LocalizedError {
 final class HealthKitDataProvider: HealthDataProvider {
     private let healthStore = HKHealthStore()
     private let calendar = Calendar.current
+    private var sleepObserverQuery: HKObserverQuery?
 
     private var sleepType: HKCategoryType {
         HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
@@ -91,6 +96,7 @@ final class HealthKitDataProvider: HealthDataProvider {
         var notes: [String] = []
 
         if let sleep = try await latestSleepSummary() {
+            form.sleepSessionEndDate = sleep.endDate
             form.sleepDurationMinutes = sleep.sleepDurationMinutes
             imported.append("Sleep duration")
             notes.append("Sleep ending \(Self.shortDateTimeFormatter.string(from: sleep.endDate))")
@@ -173,6 +179,49 @@ final class HealthKitDataProvider: HealthDataProvider {
         }
 
         return HealthDataImportResult(form: form, importedFieldNames: imported, missingFieldNames: missing, notes: notes)
+    }
+
+    func startSleepDataObservation(onUpdate: @escaping @Sendable () async -> Void) async throws {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw HealthDataProviderError.unavailable
+        }
+
+        if sleepObserverQuery == nil {
+            let query = HKObserverQuery(sampleType: sleepType, predicate: nil) { _, completionHandler, error in
+                guard error == nil else {
+                    completionHandler()
+                    return
+                }
+                var backgroundTask = UIBackgroundTaskIdentifier.invalid
+                backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "SleepDataRefresh") {
+                    if backgroundTask != .invalid {
+                        UIApplication.shared.endBackgroundTask(backgroundTask)
+                        backgroundTask = .invalid
+                    }
+                }
+                Task {
+                    await onUpdate()
+                    completionHandler()
+                    if backgroundTask != .invalid {
+                        UIApplication.shared.endBackgroundTask(backgroundTask)
+                    }
+                }
+            }
+            sleepObserverQuery = query
+            healthStore.execute(query)
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            healthStore.enableBackgroundDelivery(for: sleepType, frequency: .immediate) { success, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: HealthDataProviderError.unavailable)
+                }
+            }
+        }
     }
 
     private func ageInYears() throws -> Double? {

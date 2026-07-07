@@ -13,10 +13,18 @@ final class ScreeningStore: ObservableObject {
 
     private var engine: RLSInferenceEngine?
     private let healthDataProvider: HealthDataProvider
+    private let notificationManager: NotificationManager
     private let historyURL: URL
+    private var isAutomationConfigured = false
 
-    init(healthDataProvider: HealthDataProvider = HealthKitDataProvider()) {
+    private static let lastAutomatedSleepEndDateKey = "lastAutomatedSleepEndDate"
+
+    init(
+        healthDataProvider: HealthDataProvider = HealthKitDataProvider(),
+        notificationManager: NotificationManager = .shared
+    ) {
         self.healthDataProvider = healthDataProvider
+        self.notificationManager = notificationManager
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("RLSScreen", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -27,20 +35,8 @@ final class ScreeningStore: ObservableObject {
 
     func runScreening() {
         errorMessage = nil
-        guard let engine else {
-            errorMessage = "Model bundle could not be loaded."
-            return
-        }
         do {
-            let tier1 = try engine.predict(form.featureInput, tier: .tier1)
-            let selected = try engine.predictBestAvailable(form.featureInput)
-            let tier1Record = ScreeningRecord(prediction: tier1, input: form)
-            let selectedRecord = ScreeningRecord(prediction: selected, input: form)
-            latestTier1 = tier1Record
-            latestTier2 = selectedRecord
-            history.insert(selectedRecord, at: 0)
-            history = Array(history.prefix(30))
-            saveHistory()
+            _ = try runPrediction(input: form)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -70,11 +66,102 @@ final class ScreeningStore: ObservableObject {
         }
     }
 
+    func configureAutomation() async {
+        guard !isAutomationConfigured else {
+            return
+        }
+        isAutomationConfigured = true
+        await notificationManager.requestAuthorization()
+
+        do {
+            try await healthDataProvider.requestAuthorization()
+            try await healthDataProvider.startSleepDataObservation { [weak self] in
+                await self?.refreshFromHealthIfNeeded(source: "HealthKit", notify: true)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @discardableResult
+    func refreshFromHealthIfNeeded(source: String, notify: Bool) async -> Bool {
+        do {
+            try await healthDataProvider.requestAuthorization()
+            let result = try await healthDataProvider.latestScreeningForm(current: form)
+            guard let sleepEndDate = result.form.sleepSessionEndDate else {
+                return false
+            }
+            guard isNewSleepSession(sleepEndDate) else {
+                return false
+            }
+
+            form = result.form
+            let record = try runPrediction(input: result.form)
+            markSleepSessionProcessed(sleepEndDate)
+            healthImportMessage = "\(source) updated screening from sleep ending \(Self.shortDateTimeFormatter.string(from: sleepEndDate))."
+
+            if notify {
+                await notificationManager.notifyScreeningUpdated(record: record)
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func clearHistory() {
         history = []
         latestTier1 = nil
         latestTier2 = nil
         saveHistory()
+    }
+
+    private func runPrediction(input: ScreeningForm) throws -> ScreeningRecord {
+        guard let engine else {
+            throw ScreeningStoreError.modelBundleUnavailable
+        }
+        let tier1 = try engine.predict(input.featureInput, tier: .tier1)
+        let selected = try engine.predictBestAvailable(input.featureInput)
+        let tier1Record = ScreeningRecord(prediction: tier1, input: input)
+        let selectedRecord = ScreeningRecord(prediction: selected, input: input)
+        latestTier1 = tier1Record
+        latestTier2 = selectedRecord
+        history.insert(selectedRecord, at: 0)
+        history = Array(history.prefix(30))
+        saveHistory()
+        return selectedRecord
+    }
+
+    private func isNewSleepSession(_ sleepEndDate: Date) -> Bool {
+        guard let latestProcessed = latestProcessedSleepEndDate() else {
+            return true
+        }
+        return sleepEndDate > latestProcessed
+    }
+
+    private func latestProcessedSleepEndDate() -> Date? {
+        let storedInterval = UserDefaults.standard.double(forKey: Self.lastAutomatedSleepEndDateKey)
+        let storedDate = storedInterval > 0 ? Date(timeIntervalSinceReferenceDate: storedInterval) : nil
+        let historyDate = history.compactMap { $0.input.sleepSessionEndDate }.max()
+
+        switch (storedDate, historyDate) {
+        case let (stored?, history?):
+            return max(stored, history)
+        case let (stored?, nil):
+            return stored
+        case let (nil, history?):
+            return history
+        case (nil, nil):
+            return nil
+        }
+    }
+
+    private func markSleepSessionProcessed(_ sleepEndDate: Date) {
+        UserDefaults.standard.set(
+            sleepEndDate.timeIntervalSinceReferenceDate,
+            forKey: Self.lastAutomatedSleepEndDateKey
+        )
     }
 
     private func saveHistory() {
@@ -99,6 +186,26 @@ final class ScreeningStore: ObservableObject {
         }
         return try? RLSInferenceEngine(modelBundleURL: url)
     }
+}
+
+enum ScreeningStoreError: LocalizedError {
+    case modelBundleUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .modelBundleUnavailable:
+            return "Model bundle could not be loaded."
+        }
+    }
+}
+
+private extension ScreeningStore {
+    static var shortDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 }
 
 private extension JSONEncoder {

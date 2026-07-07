@@ -19,6 +19,8 @@
 		0A000001000000000000000A /* Views/ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010A /* Views/ViewModifiers.swift */; };
 		0A000001000000000000000B /* Resources/RLSModelBundle.json in Resources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010B /* Resources/RLSModelBundle.json */; };
 		0A000001000000000000000C /* RLSInference in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000010000000000000502 /* RLSInference */; };
+		0A000001000000000000000D /* Models/NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010E /* Models/NotificationManager.swift */; };
+		0A000001000000000000000E /* Models/BackgroundRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010F /* Models/BackgroundRefreshCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +37,9 @@
 		0A000001000000000000010B /* Resources/RLSModelBundle.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Resources/RLSModelBundle.json; sourceTree = "<group>"; };
 		0A000001000000000000010C /* RLSScreen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RLSScreen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A000001000000000000010D /* RLSScreen.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RLSScreen.entitlements; sourceTree = "<group>"; };
+		0A000001000000000000010E /* Models/NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/NotificationManager.swift; sourceTree = "<group>"; };
+		0A000001000000000000010F /* Models/BackgroundRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/BackgroundRefreshCoordinator.swift; sourceTree = "<group>"; };
+		0A0000010000000000000110 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +67,7 @@
 			children = (
 				0A0000010000000000000101 /* RLSScreenApp.swift */,
 				0A000001000000000000010D /* RLSScreen.entitlements */,
+				0A0000010000000000000110 /* Info.plist */,
 				0A0000010000000000000304 /* Models */,
 				0A0000010000000000000305 /* Views */,
 				0A0000010000000000000306 /* Resources */,
@@ -83,6 +89,8 @@
 				0A0000010000000000000102 /* Models/ScreeningModels.swift */,
 				0A0000010000000000000103 /* Models/ScreeningStore.swift */,
 				0A0000010000000000000104 /* Models/HealthDataProvider.swift */,
+				0A000001000000000000010E /* Models/NotificationManager.swift */,
+				0A000001000000000000010F /* Models/BackgroundRefreshCoordinator.swift */,
 			);
 			name = Models;
 			sourceTree = "<group>";
@@ -144,6 +152,9 @@
 					0A0000010000000000000401 = {
 						CreatedOnToolsVersion = 16.0;
 						SystemCapabilities = {
+							com.apple.BackgroundModes = {
+								enabled = 1;
+							};
 							com.apple.HealthKit = {
 								enabled = 1;
 							};
@@ -198,6 +209,8 @@
 				0A0000010000000000000008 /* Views/HistoryView.swift in Sources */,
 				0A0000010000000000000009 /* Views/ModelInfoView.swift in Sources */,
 				0A000001000000000000000A /* Views/ViewModifiers.swift in Sources */,
+				0A000001000000000000000D /* Models/NotificationManager.swift in Sources */,
+				0A000001000000000000000E /* Models/BackgroundRefreshCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -328,12 +341,8 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = DJ55HUN7DC;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "RLS Screen";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "RLS Screen reads sleep stages, heart rate, blood oxygen, height, weight, age, and sex from Health to fill local screening inputs.";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RLSScreen/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = local.rls.screen;
@@ -355,12 +364,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = DJ55HUN7DC;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "RLS Screen";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "RLS Screen reads sleep stages, heart rate, blood oxygen, height, weight, age, and sex from Health to fill local screening inputs.";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RLSScreen/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = local.rls.screen;

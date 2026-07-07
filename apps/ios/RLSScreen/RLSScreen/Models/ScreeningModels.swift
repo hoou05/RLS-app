@@ -2,6 +2,7 @@ import Foundation
 import RLSInference
 
 struct ScreeningForm: Codable, Equatable {
+    var sleepSessionEndDate: Date?
     var sleepDurationMinutes = 405.0
     var sleepEfficiency = 80.0
     var wasoMinutes: Double?
