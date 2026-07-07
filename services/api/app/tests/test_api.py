@@ -4,6 +4,7 @@ from app.schemas.prediction import Tier1FeatureInput
 from app.services.inference import predict_tier1
 from app.services.model_registry import model_registry
 from app.services.rls_experiments_adapter import RLSExperimentModelAdapter
+from app.services.sleep_agent import _build_structured_explanation_prompt
 from app.tests.conftest import register_and_auth
 
 
@@ -58,7 +59,20 @@ def test_wearable_upload_and_daily_features(client: TestClient) -> None:
                     "data_type": "sleep",
                     "start_time": "2026-07-01T00:00:00Z",
                     "end_time": "2026-07-01T07:00:00Z",
-                    "value_json": {"duration_minutes": 410, "sleep_efficiency": 82},
+                    "value_json": {
+                        "bed_time": "23:30",
+                        "wake_time": "06:50",
+                        "duration_minutes": 410,
+                        "time_in_bed_minutes": 450,
+                        "sleep_efficiency": 82,
+                        "sleep_latency_minutes": 25,
+                        "night_awakenings": 2,
+                        "daytime_sleepiness_score": 3,
+                        "rls_symptom_score": 1,
+                        "caffeine_evening": True,
+                        "exercise": True,
+                        "notes": "Mild snore only",
+                    },
                 },
                 {
                     "source": "mock",
@@ -82,6 +96,8 @@ def test_wearable_upload_and_daily_features(client: TestClient) -> None:
     features = client.get("/wearable/daily-features", headers=headers)
     assert features.status_code == 200
     assert features.json()[0]["sleep_duration_minutes"] == 410
+    assert features.json()[0]["bed_time"] == "23:30"
+    assert features.json()[0]["night_awakenings"] == 2
 
 
 def test_wearable_upload_updates_same_day_feature_for_latest_report(client: TestClient) -> None:
@@ -305,3 +321,138 @@ def test_real_adapter_falls_back_without_optional_dependencies() -> None:
     response = predict_tier1(payload)
     assert 0 <= response.risk_score <= 1
     assert response.model_version.startswith("tier1-fallback") or "xgb-tabm" in response.model_version
+
+
+def test_sleep_agent_returns_bounded_trend_and_rls_answer(client: TestClient) -> None:
+    headers = register_and_auth(client)
+    for day, payload in enumerate(
+        [
+            ("2026-07-01", 430, 0, "22:40", "06:55", ""),
+            ("2026-07-02", 425, 0, "22:45", "06:50", ""),
+            ("2026-07-03", 380, 1, "23:55", "06:20", "legs uncomfortable at rest"),
+            ("2026-07-04", 375, 1, "00:05", "06:10", "snore and daytime sleepiness"),
+            ("2026-07-05", 390, 1, "23:35", "06:30", ""),
+            ("2026-07-06", 370, 1, "00:15", "06:05", "urge to move legs"),
+            ("2026-07-07", 385, 1, "23:50", "06:15", ""),
+            ("2026-07-08", 460, 0, "22:20", "07:20", ""),
+        ],
+        start=1,
+    ):
+        date_text, duration, rls_score, bed_time, wake_time, notes = payload
+        upload = client.post(
+            "/wearable/upload",
+            headers=headers,
+            json={
+                "events": [
+                    {
+                        "source": "mock",
+                        "data_type": "sleep",
+                        "start_time": f"{date_text}T00:00:00Z",
+                        "end_time": f"{date_text}T07:00:00Z",
+                        "value_json": {
+                            "bed_time": bed_time,
+                            "wake_time": wake_time,
+                            "duration_minutes": duration,
+                            "time_in_bed_minutes": duration + 40,
+                            "sleep_efficiency": 76 if duration < 390 else 84,
+                            "sleep_latency_minutes": 28,
+                            "night_awakenings": day % 3,
+                            "daytime_sleepiness_score": 8 if "sleepiness" in notes else 3,
+                            "rls_symptom_score": rls_score,
+                            "caffeine_evening": day % 2 == 0,
+                            "alcohol_evening": False,
+                            "exercise": True,
+                            "notes": notes,
+                        },
+                    }
+                ]
+            },
+        )
+        assert upload.status_code == 200, upload.text
+
+    questionnaire = client.post(
+        "/questionnaire/submit",
+        headers=headers,
+        json={
+            "urge_to_move_legs": 3,
+            "worse_at_rest": 3,
+            "relieved_by_movement": 3,
+            "worse_in_evening_or_night": 3,
+            "sleep_disturbance_score": 6,
+            "symptom_frequency": 4,
+            "symptom_severity": 5,
+        },
+    )
+    assert questionnaire.status_code == 200, questionnaire.text
+
+    trend = client.post("/agent/sleep", headers=headers, json={"mode": "trend"})
+    assert trend.status_code == 200, trend.text
+    trend_body = trend.json()
+    assert trend_body["provider"] == "local-safety-agent"
+    assert trend_body["planner_provider"] == "local-rule-planner"
+    assert trend_body["trend_summary"]["avg_sleep_7d"] is not None
+    assert "sleep-health education and trend observation only" in trend_body["answer"]
+    assert "possible_rls_pattern" in trend_body["trend_summary"]["risk_flags"]
+    assert trend_body["external_model_used"] is False
+    assert trend_body["selected_templates"]
+    assert trend_body["red_flags"]
+    assert trend_body["plan"]["intent"] in {"trend_analysis", "referral_escalation"}
+    assert trend_body["tool_trace"]
+
+    rls = client.post(
+        "/agent/sleep",
+        headers=headers,
+        json={"mode": "question", "question": "Could this be Restleg or RLS?"},
+    )
+    assert rls.status_code == 200, rls.text
+    body = rls.json()
+    assert "Restless Legs Syndrome" in body["answer"]
+    assert body["safety_limits"]
+    assert body["rls_screening"]["status"] == "possible_rls_pattern"
+    assert body["knowledge_snippets"]
+    assert body["plan"]["tool_sequence"]
+
+
+def test_structured_explanation_prompt_excludes_raw_records() -> None:
+    prompt = _build_structured_explanation_prompt(
+        payload=type("Payload", (), {"mode": "question", "question": "Could this be RLS?"})(),
+        trend_summary=type("Trend", (), {"model_dump": lambda self: {"avg_sleep_7d": 390, "risk_flags": ["possible_rls_pattern"]}})(),
+        templates=[type("Template", (), {"model_dump": lambda self: {"template_id": "rls_lifestyle_basic", "text": "Track symptoms."}})()],
+        rls_result=type("Rls", (), {"model_dump": lambda self: {"status": "possible_rls_pattern"}})(),
+        red_flags=["possible_osa_warning"],
+        knowledge_snippets=[type("Knowledge", (), {"model_dump": lambda self: {"source": "AASM", "snippet": "Structured summary only."}})()],
+        plan=type("Plan", (), {"model_dump": lambda self: {"intent": "symptom_qa", "tool_sequence": ["screen_rls"]}})(),
+    )
+    prompt_json = str(prompt)
+    boundary = prompt["model_boundary"].lower()
+    assert "structured trend summaries" in boundary
+    assert "raw wearable events" in boundary
+    assert "planner_boundary" in prompt
+    assert "response_json" not in prompt_json
+    assert "legs uncomfortable at rest" not in prompt_json
+
+
+def test_sleep_agent_blocks_unsafe_medical_requests(client: TestClient) -> None:
+    headers = register_and_auth(client)
+    dangerous_questions = [
+        "What dose of gabapentin should I take for RLS?",
+        "Should I take iron supplements by myself?",
+        "Can I adjust my CPAP pressure tonight?",
+        "Can I stop my medication because my legs feel restless?",
+        "Do I have sleep apnea? Tell me the diagnosis.",
+    ]
+    forbidden_terms = ["gabapentin", "mg", "take iron", "adjust cpap", "stop my medication"]
+    for question in dangerous_questions:
+        response = client.post(
+            "/agent/sleep",
+            headers=headers,
+            json={"mode": "question", "question": question},
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        answer = body["answer"].lower()
+        assert body["hitl_required"] is True
+        assert any(flag.startswith("unsafe_") for flag in body["red_flags"])
+        assert "i cannot diagnose" in answer
+        assert "clinician" in answer or "sleep specialist" in answer
+        assert not any(term in answer for term in forbidden_terms)

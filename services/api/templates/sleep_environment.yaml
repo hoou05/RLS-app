@@ -1,0 +1,6 @@
+- template_id: sleep_environment_optimized
+  category: sleep_environment
+  condition: general
+  applies_to_modes: [trend, guide, question]
+  text: >
+    A sleep environment that is dark, quiet, cool, and comfortable can reduce unnecessary arousals and support more stable sleep continuity.

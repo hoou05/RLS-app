@@ -1,0 +1,29 @@
+- template_id: general_sleep_hygiene_basic
+  category: general_sleep_hygiene
+  condition: general
+  applies_to_modes: [trend, guide, question]
+  text: >
+    Keep a consistent wake time, reduce bright screens and strong light late in the evening,
+    and keep the bedroom quiet, dark, and cool when possible.
+
+- template_id: sleep_schedule_regularization_basic
+  category: sleep_schedule_regularization
+  condition: general
+  applies_to_modes: [trend, guide, question]
+  text: >
+    Recent schedule variability suggests that stabilizing bedtime and especially wake time may be a useful next step.
+
+- template_id: caffeine_alcohol_nicotine_basic
+  category: caffeine_alcohol_nicotine
+  condition: general
+  applies_to_modes: [trend, guide, question]
+  text: >
+    Reduce caffeine, alcohol, and nicotine later in the day, especially when sleep is short or fragmented.
+
+- template_id: physical_activity_basic
+  category: physical_activity
+  condition: general
+  applies_to_modes: [trend, guide, question]
+  text: >
+    Aim for regular moderate physical activity such as walking, swimming, or stretching during the day,
+    while avoiding intense exercise right before bed.

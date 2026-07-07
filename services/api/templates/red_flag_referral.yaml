@@ -1,0 +1,6 @@
+- template_id: red_flag_referral_general
+  category: red_flag_referral
+  condition: general
+  applies_to_modes: [trend, guide, question]
+  text: >
+    Because some higher-risk symptoms or medical-context questions are present, the safer next step is to speak with a clinician or sleep specialist rather than self-managing alone.

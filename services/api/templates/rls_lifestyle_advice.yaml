@@ -1,0 +1,20 @@
+- template_id: rls_lifestyle_basic
+  category: rls_lifestyle_advice
+  condition: RLS
+  applies_to_modes: [trend, guide, question]
+  text: >
+    If leg discomfort tends to appear at rest and improve after movement, it can help to track timing,
+    triggers, and whether walking or stretching gives relief.
+  forbidden:
+    - medication
+    - dose
+    - diagnosis
+    - iron_supplementation
+
+- template_id: rls_referral_basic
+  category: red_flag_referral
+  condition: RLS
+  applies_to_modes: [trend, question]
+  text: >
+    If leg symptoms repeatedly delay sleep, spread beyond the legs, worsen quickly, or meaningfully affect daytime function,
+    discuss them with a clinician or sleep specialist.

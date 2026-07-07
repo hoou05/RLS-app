@@ -1,0 +1,7 @@
+- template_id: osa_warning_basic
+  category: sleep_apnea_warning
+  condition: OSA
+  applies_to_modes: [trend, question]
+  text: >
+    Loud snoring, witnessed breathing pauses, choking awakenings, or strong daytime sleepiness are reasons
+    to consider medical follow-up for possible sleep apnea evaluation.

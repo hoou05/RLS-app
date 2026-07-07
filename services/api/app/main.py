@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import routes_auth, routes_questionnaire, routes_reports, routes_users, routes_wearable
+from app.api import routes_agent, routes_auth, routes_questionnaire, routes_reports, routes_users, routes_wearable
 from app.api.routes_prediction import history_router, router as prediction_router
 from app.core.config import get_settings
 from app.db.session import init_db
@@ -38,3 +38,4 @@ app.include_router(routes_questionnaire.router)
 app.include_router(prediction_router)
 app.include_router(history_router)
 app.include_router(routes_reports.router)
+app.include_router(routes_agent.router)

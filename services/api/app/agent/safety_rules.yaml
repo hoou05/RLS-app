@@ -1,0 +1,16 @@
+forbidden_outputs:
+  - direct_diagnosis
+  - prescription_medication
+  - medication_dose
+  - iron_supplement_instruction
+  - stop_or_change_medication
+  - device_purchase_recommendation
+  - cpap_pressure_adjustment
+  - emergency_management_without_referral
+
+allowed_outputs:
+  - general_sleep_education
+  - symptom_tracking
+  - lifestyle_suggestions
+  - referral_recommendation
+  - trend_observation
