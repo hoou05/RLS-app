@@ -16,8 +16,6 @@ struct ScreeningView: View {
 
                     HealthImportView()
 
-                    InputSectionView(form: $store.form, focusedField: $focusedField)
-
                     if let message = store.healthImportMessage {
                         Text(message)
                             .font(.footnote.weight(.semibold))
@@ -31,6 +29,8 @@ struct ScreeningView: View {
                             .foregroundStyle(.red)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+
+                    InputSectionView(form: $store.form, focusedField: $focusedField)
 
                     Button {
                         focusedField = nil

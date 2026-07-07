@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import pickle
 from typing import Any
@@ -18,6 +19,8 @@ class ModelRegistry:
         self._cache: dict[str, Any] = {}
 
     def load(self, tier: str) -> Any | None:
+        if os.getenv("RLS_FORCE_FALLBACK_MODEL", "").strip().lower() in {"1", "true", "yes"}:
+            return None
         path = self.artifact_dir / f"{tier}_model.pkl"
         if not path.exists():
             scenario = RLS_EXPERIMENT_SCENARIOS.get(tier)

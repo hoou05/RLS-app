@@ -5,6 +5,7 @@ struct HealthDataImportResult: Equatable {
     var form: ScreeningForm
     var importedFieldNames: [String]
     var missingFieldNames: [String]
+    var notes: [String]
 }
 
 protocol HealthDataProvider {
@@ -16,7 +17,7 @@ struct ManualOnlyHealthDataProvider: HealthDataProvider {
     func requestAuthorization() async throws {}
 
     func latestScreeningForm(current: ScreeningForm) async throws -> HealthDataImportResult {
-        HealthDataImportResult(form: current, importedFieldNames: [], missingFieldNames: [])
+        HealthDataImportResult(form: current, importedFieldNames: [], missingFieldNames: [], notes: [])
     }
 }
 
@@ -29,7 +30,7 @@ enum HealthDataProviderError: LocalizedError {
         case .unavailable:
             return "Health data is not available on this device."
         case .missingReadableData:
-            return "No readable Health data was found. You can keep using manual inputs."
+            return "No Health data could be read. If permissions were turned off, re-enable RLS Screen in Health permissions, then try again."
         }
     }
 }
@@ -86,10 +87,12 @@ final class HealthKitDataProvider: HealthDataProvider {
         var form = current
         var imported: [String] = []
         var missing: [String] = []
+        var notes: [String] = []
 
         if let sleep = try await latestSleepSummary() {
             form.sleepDurationMinutes = sleep.sleepDurationMinutes
             imported.append("Sleep duration")
+            notes.append("Sleep ending \(Self.shortDateTimeFormatter.string(from: sleep.endDate))")
             if let efficiency = sleep.sleepEfficiency {
                 form.sleepEfficiency = efficiency
                 imported.append("Sleep efficiency")
@@ -146,7 +149,7 @@ final class HealthKitDataProvider: HealthDataProvider {
             throw HealthDataProviderError.missingReadableData
         }
 
-        return HealthDataImportResult(form: form, importedFieldNames: imported, missingFieldNames: missing)
+        return HealthDataImportResult(form: form, importedFieldNames: imported, missingFieldNames: missing, notes: notes)
     }
 
     private func ageInYears() throws -> Double? {
@@ -181,6 +184,10 @@ final class HealthKitDataProvider: HealthDataProvider {
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [sort]) { _, samples, error in
                 if let error {
+                    if Self.isNoDataError(error) {
+                        continuation.resume(returning: nil)
+                        return
+                    }
                     continuation.resume(throwing: error)
                     return
                 }
@@ -203,6 +210,10 @@ final class HealthKitDataProvider: HealthDataProvider {
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .discreteAverage) { _, statistics, error in
                 if let error {
+                    if Self.isNoDataError(error) {
+                        continuation.resume(returning: nil)
+                        return
+                    }
                     continuation.resume(throwing: error)
                     return
                 }
@@ -212,45 +223,53 @@ final class HealthKitDataProvider: HealthDataProvider {
         }
     }
 
-    private func latestSleepSummary() async throws -> (sleepDurationMinutes: Double, sleepEfficiency: Double?)? {
+    private func latestSleepSummary() async throws -> SleepSummary? {
         let end = Date()
-        let start = end.addingTimeInterval(-36 * 3_600)
+        let start = end.addingTimeInterval(-14 * 86_400)
         let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictEndDate)
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
 
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sort]) { _, samples, error in
                 if let error {
+                    if Self.isNoDataError(error) {
+                        continuation.resume(returning: nil)
+                        return
+                    }
                     continuation.resume(throwing: error)
                     return
                 }
 
                 let sleepSamples = (samples as? [HKCategorySample]) ?? []
-                let asleepIntervals = sleepSamples.compactMap { sample -> DateInterval? in
-                    guard Self.isAsleepValue(sample.value) else {
-                        return nil
-                    }
-                    return DateInterval(start: sample.startDate, end: sample.endDate)
-                }
-                let inBedIntervals = sleepSamples.compactMap { sample -> DateInterval? in
-                    guard sample.value == HKCategoryValueSleepAnalysis.inBed.rawValue else {
-                        return nil
-                    }
-                    return DateInterval(start: sample.startDate, end: sample.endDate)
-                }
-
-                let asleepSeconds = Self.unionDuration(of: asleepIntervals)
-                guard asleepSeconds > 0 else {
+                guard let session = Self.latestMajorSleepSession(from: sleepSamples) else {
                     continuation.resume(returning: nil)
                     return
                 }
-
-                let inBedSeconds = Self.unionDuration(of: inBedIntervals)
-                let efficiency = inBedSeconds > 0 ? min(100.0, max(0.0, asleepSeconds / inBedSeconds * 100.0)) : nil
-                continuation.resume(returning: (asleepSeconds / 60.0, efficiency))
+                continuation.resume(returning: session)
             }
             healthStore.execute(query)
         }
+    }
+
+    private struct SleepSummary {
+        let startDate: Date
+        let endDate: Date
+        let sleepDurationMinutes: Double
+        let sleepEfficiency: Double?
+    }
+
+    private static var shortDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    private static func isNoDataError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == HKError.errorDomain
+            && nsError.localizedDescription.localizedCaseInsensitiveContains("no data")
+            && nsError.localizedDescription.localizedCaseInsensitiveContains("predicate")
     }
 
     private static func isAsleepValue(_ value: Int) -> Bool {
@@ -261,6 +280,81 @@ final class HealthKitDataProvider: HealthDataProvider {
             HKCategoryValueSleepAnalysis.asleepREM.rawValue,
         ]
         return asleepValues.contains(value)
+    }
+
+    private static func isSleepSessionValue(_ value: Int) -> Bool {
+        value == HKCategoryValueSleepAnalysis.inBed.rawValue || isAsleepValue(value)
+    }
+
+    private static func latestMajorSleepSession(from samples: [HKCategorySample]) -> SleepSummary? {
+        let sorted = samples
+            .filter { isSleepSessionValue($0.value) }
+            .sorted { $0.startDate < $1.startDate }
+
+        var sessions: [[HKCategorySample]] = []
+        var current: [HKCategorySample] = []
+        var currentEnd: Date?
+        let maximumSessionGap: TimeInterval = 3 * 3_600
+
+        for sample in sorted {
+            guard let end = currentEnd else {
+                current = [sample]
+                currentEnd = sample.endDate
+                continue
+            }
+
+            if sample.startDate.timeIntervalSince(end) <= maximumSessionGap {
+                current.append(sample)
+                currentEnd = max(end, sample.endDate)
+            } else {
+                sessions.append(current)
+                current = [sample]
+                currentEnd = sample.endDate
+            }
+        }
+
+        if !current.isEmpty {
+            sessions.append(current)
+        }
+
+        return sessions
+            .compactMap(makeSleepSummary)
+            .sorted { $0.endDate > $1.endDate }
+            .first
+    }
+
+    private static func makeSleepSummary(from samples: [HKCategorySample]) -> SleepSummary? {
+        let asleepIntervals = samples.compactMap { sample -> DateInterval? in
+            guard isAsleepValue(sample.value) else {
+                return nil
+            }
+            return DateInterval(start: sample.startDate, end: sample.endDate)
+        }
+        let inBedIntervals = samples.compactMap { sample -> DateInterval? in
+            guard sample.value == HKCategoryValueSleepAnalysis.inBed.rawValue else {
+                return nil
+            }
+            return DateInterval(start: sample.startDate, end: sample.endDate)
+        }
+
+        let asleepSeconds = unionDuration(of: asleepIntervals)
+        guard asleepSeconds >= 60 * 60 else {
+            return nil
+        }
+
+        let sessionStart = samples.map(\.startDate).min() ?? Date()
+        let sessionEnd = samples.map(\.endDate).max() ?? sessionStart
+        let inBedSeconds = unionDuration(of: inBedIntervals)
+        let sessionSeconds = max(sessionEnd.timeIntervalSince(sessionStart), 1)
+        let denominator = inBedSeconds > 0 ? inBedSeconds : sessionSeconds
+        let efficiency = min(100.0, max(0.0, asleepSeconds / denominator * 100.0))
+
+        return SleepSummary(
+            startDate: sessionStart,
+            endDate: sessionEnd,
+            sleepDurationMinutes: asleepSeconds / 60.0,
+            sleepEfficiency: efficiency
+        )
     }
 
     private static func unionDuration(of intervals: [DateInterval]) -> TimeInterval {

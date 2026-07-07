@@ -7,6 +7,10 @@ __pycache__/
 *.pyc
 *.db
 
+# Restricted research datasets and derived local validation outputs.
+data/
+outputs/
+
 node_modules/
 dist/
 .vite/

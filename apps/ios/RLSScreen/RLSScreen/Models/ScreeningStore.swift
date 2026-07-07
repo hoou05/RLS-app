@@ -58,11 +58,12 @@ final class ScreeningStore: ObservableObject {
             form = result.form
 
             let imported = result.importedFieldNames.joined(separator: ", ")
+            let notes = result.notes.isEmpty ? "" : " \(result.notes.joined(separator: "; "))."
             if result.missingFieldNames.isEmpty {
-                healthImportMessage = "Imported from Health: \(imported)."
+                healthImportMessage = "Imported from Health: \(imported).\(notes)"
             } else {
                 let missing = result.missingFieldNames.joined(separator: ", ")
-                healthImportMessage = "Imported from Health: \(imported). Missing: \(missing)."
+                healthImportMessage = "Imported from Health: \(imported). Missing: \(missing).\(notes)"
             }
         } catch {
             errorMessage = error.localizedDescription

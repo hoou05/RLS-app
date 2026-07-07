@@ -11,10 +11,12 @@ let package = Package(
     products: [
         .library(name: "RLSInference", targets: ["RLSInference"]),
         .executable(name: "RLSInferenceSmoke", targets: ["RLSInferenceSmoke"]),
+        .executable(name: "RLSInferenceBenchmark", targets: ["RLSInferenceBenchmark"]),
     ],
     targets: [
         .target(name: "RLSInference"),
         .executableTarget(name: "RLSInferenceSmoke", dependencies: ["RLSInference"]),
+        .executableTarget(name: "RLSInferenceBenchmark", dependencies: ["RLSInference"]),
         .testTarget(name: "RLSInferenceTests", dependencies: ["RLSInference"]),
     ]
 )

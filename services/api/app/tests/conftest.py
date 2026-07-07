@@ -4,6 +4,7 @@ from collections.abc import Generator
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["SECRET_KEY"] = "test-secret"
+os.environ["RLS_FORCE_FALLBACK_MODEL"] = "1"
 
 from fastapi.testclient import TestClient
 import pytest

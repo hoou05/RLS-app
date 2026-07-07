@@ -93,8 +93,6 @@ class RLSExperimentModelAdapter:
             import numpy as np
             import pandas as pd
             import scipy.special
-            import tabm as tabm_pkg
-            import torch
             from xgboost import XGBClassifier
         except ImportError as exc:
             raise ModelAdapterUnavailable(
@@ -104,7 +102,6 @@ class RLSExperimentModelAdapter:
         self._np = np
         self._pd = pd
         self._scipy_special = scipy.special
-        self._torch = torch
         self.meta = json.loads((self.scenario_dir / "meta.json").read_text(encoding="utf-8"))
 
         self._xgb_models = []
@@ -112,6 +109,16 @@ class RLSExperimentModelAdapter:
             model = XGBClassifier()
             model.load_model(str(self.scenario_dir / f"xgb_{idx}.ubj"))
             self._xgb_models.append(model)
+
+        try:
+            import tabm as tabm_pkg
+            import torch
+        except ImportError as exc:
+            raise ModelAdapterUnavailable(
+                "Real RLS model dependencies are not installed. Install services/api/requirements-model.txt."
+            ) from exc
+
+        self._torch = torch
 
         cfg = self.meta["tabm_config"]
         n_features = len(self.meta["tabm_features"])

@@ -3,36 +3,36 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		0A0000010000000000000001 /* RLSScreenApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000101 /* RLSScreenApp.swift */; };
-		0A0000010000000000000002 /* ScreeningModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000102 /* ScreeningModels.swift */; };
-		0A0000010000000000000003 /* ScreeningStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000103 /* ScreeningStore.swift */; };
-		0A0000010000000000000004 /* HealthDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000104 /* HealthDataProvider.swift */; };
-		0A0000010000000000000005 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000105 /* ContentView.swift */; };
-		0A0000010000000000000006 /* ScreeningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000106 /* ScreeningView.swift */; };
-		0A0000010000000000000007 /* InputSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000107 /* InputSectionView.swift */; };
-		0A0000010000000000000008 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000108 /* HistoryView.swift */; };
-		0A0000010000000000000009 /* ModelInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000109 /* ModelInfoView.swift */; };
-		0A000001000000000000000A /* ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010A /* ViewModifiers.swift */; };
-		0A000001000000000000000B /* RLSModelBundle.json in Resources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010B /* RLSModelBundle.json */; };
+		0A0000010000000000000002 /* Models/ScreeningModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000102 /* Models/ScreeningModels.swift */; };
+		0A0000010000000000000003 /* Models/ScreeningStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000103 /* Models/ScreeningStore.swift */; };
+		0A0000010000000000000004 /* Models/HealthDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000104 /* Models/HealthDataProvider.swift */; };
+		0A0000010000000000000005 /* Views/ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000105 /* Views/ContentView.swift */; };
+		0A0000010000000000000006 /* Views/ScreeningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000106 /* Views/ScreeningView.swift */; };
+		0A0000010000000000000007 /* Views/InputSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000107 /* Views/InputSectionView.swift */; };
+		0A0000010000000000000008 /* Views/HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000108 /* Views/HistoryView.swift */; };
+		0A0000010000000000000009 /* Views/ModelInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000109 /* Views/ModelInfoView.swift */; };
+		0A000001000000000000000A /* Views/ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010A /* Views/ViewModifiers.swift */; };
+		0A000001000000000000000B /* Resources/RLSModelBundle.json in Resources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010B /* Resources/RLSModelBundle.json */; };
 		0A000001000000000000000C /* RLSInference in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000010000000000000502 /* RLSInference */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0A0000010000000000000101 /* RLSScreenApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RLSScreenApp.swift; sourceTree = "<group>"; };
-		0A0000010000000000000102 /* ScreeningModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/ScreeningModels.swift; sourceTree = "<group>"; };
-		0A0000010000000000000103 /* ScreeningStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/ScreeningStore.swift; sourceTree = "<group>"; };
-		0A0000010000000000000104 /* HealthDataProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/HealthDataProvider.swift; sourceTree = "<group>"; };
-		0A0000010000000000000105 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ContentView.swift; sourceTree = "<group>"; };
-		0A0000010000000000000106 /* ScreeningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ScreeningView.swift; sourceTree = "<group>"; };
-		0A0000010000000000000107 /* InputSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/InputSectionView.swift; sourceTree = "<group>"; };
-		0A0000010000000000000108 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/HistoryView.swift; sourceTree = "<group>"; };
-		0A0000010000000000000109 /* ModelInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ModelInfoView.swift; sourceTree = "<group>"; };
-		0A000001000000000000010A /* ViewModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ViewModifiers.swift; sourceTree = "<group>"; };
-		0A000001000000000000010B /* RLSModelBundle.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Resources/RLSModelBundle.json; sourceTree = "<group>"; };
+		0A0000010000000000000102 /* Models/ScreeningModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/ScreeningModels.swift; sourceTree = "<group>"; };
+		0A0000010000000000000103 /* Models/ScreeningStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/ScreeningStore.swift; sourceTree = "<group>"; };
+		0A0000010000000000000104 /* Models/HealthDataProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/HealthDataProvider.swift; sourceTree = "<group>"; };
+		0A0000010000000000000105 /* Views/ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ContentView.swift; sourceTree = "<group>"; };
+		0A0000010000000000000106 /* Views/ScreeningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ScreeningView.swift; sourceTree = "<group>"; };
+		0A0000010000000000000107 /* Views/InputSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/InputSectionView.swift; sourceTree = "<group>"; };
+		0A0000010000000000000108 /* Views/HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/HistoryView.swift; sourceTree = "<group>"; };
+		0A0000010000000000000109 /* Views/ModelInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ModelInfoView.swift; sourceTree = "<group>"; };
+		0A000001000000000000010A /* Views/ViewModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ViewModifiers.swift; sourceTree = "<group>"; };
+		0A000001000000000000010B /* Resources/RLSModelBundle.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Resources/RLSModelBundle.json; sourceTree = "<group>"; };
 		0A000001000000000000010C /* RLSScreen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RLSScreen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A000001000000000000010D /* RLSScreen.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RLSScreen.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -80,9 +80,9 @@
 		0A0000010000000000000304 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				0A0000010000000000000102 /* ScreeningModels.swift */,
-				0A0000010000000000000103 /* ScreeningStore.swift */,
-				0A0000010000000000000104 /* HealthDataProvider.swift */,
+				0A0000010000000000000102 /* Models/ScreeningModels.swift */,
+				0A0000010000000000000103 /* Models/ScreeningStore.swift */,
+				0A0000010000000000000104 /* Models/HealthDataProvider.swift */,
 			);
 			name = Models;
 			sourceTree = "<group>";
@@ -90,12 +90,12 @@
 		0A0000010000000000000305 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				0A0000010000000000000105 /* ContentView.swift */,
-				0A0000010000000000000106 /* ScreeningView.swift */,
-				0A0000010000000000000107 /* InputSectionView.swift */,
-				0A0000010000000000000108 /* HistoryView.swift */,
-				0A0000010000000000000109 /* ModelInfoView.swift */,
-				0A000001000000000000010A /* ViewModifiers.swift */,
+				0A0000010000000000000105 /* Views/ContentView.swift */,
+				0A0000010000000000000106 /* Views/ScreeningView.swift */,
+				0A0000010000000000000107 /* Views/InputSectionView.swift */,
+				0A0000010000000000000108 /* Views/HistoryView.swift */,
+				0A0000010000000000000109 /* Views/ModelInfoView.swift */,
+				0A000001000000000000010A /* Views/ViewModifiers.swift */,
 			);
 			name = Views;
 			sourceTree = "<group>";
@@ -103,7 +103,7 @@
 		0A0000010000000000000306 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				0A000001000000000000010B /* RLSModelBundle.json */,
+				0A000001000000000000010B /* Resources/RLSModelBundle.json */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -177,7 +177,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0A000001000000000000000B /* RLSModelBundle.json in Resources */,
+				0A000001000000000000000B /* Resources/RLSModelBundle.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -189,15 +189,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				0A0000010000000000000001 /* RLSScreenApp.swift in Sources */,
-				0A0000010000000000000002 /* ScreeningModels.swift in Sources */,
-				0A0000010000000000000003 /* ScreeningStore.swift in Sources */,
-				0A0000010000000000000004 /* HealthDataProvider.swift in Sources */,
-				0A0000010000000000000005 /* ContentView.swift in Sources */,
-				0A0000010000000000000006 /* ScreeningView.swift in Sources */,
-				0A0000010000000000000007 /* InputSectionView.swift in Sources */,
-				0A0000010000000000000008 /* HistoryView.swift in Sources */,
-				0A0000010000000000000009 /* ModelInfoView.swift in Sources */,
-				0A000001000000000000000A /* ViewModifiers.swift in Sources */,
+				0A0000010000000000000002 /* Models/ScreeningModels.swift in Sources */,
+				0A0000010000000000000003 /* Models/ScreeningStore.swift in Sources */,
+				0A0000010000000000000004 /* Models/HealthDataProvider.swift in Sources */,
+				0A0000010000000000000005 /* Views/ContentView.swift in Sources */,
+				0A0000010000000000000006 /* Views/ScreeningView.swift in Sources */,
+				0A0000010000000000000007 /* Views/InputSectionView.swift in Sources */,
+				0A0000010000000000000008 /* Views/HistoryView.swift in Sources */,
+				0A0000010000000000000009 /* Views/ModelInfoView.swift in Sources */,
+				0A000001000000000000000A /* Views/ViewModifiers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -334,7 +334,7 @@
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "local.rls.screen";
+				PRODUCT_BUNDLE_IDENTIFIER = local.rls.screen;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -358,7 +358,7 @@
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "local.rls.screen";
+				PRODUCT_BUNDLE_IDENTIFIER = local.rls.screen;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
