@@ -389,10 +389,10 @@ def test_sleep_agent_returns_bounded_trend_and_rls_answer(client: TestClient) ->
     trend = client.post("/agent/sleep", headers=headers, json={"mode": "trend"})
     assert trend.status_code == 200, trend.text
     trend_body = trend.json()
-    assert trend_body["provider"] == "local-safety-agent"
+    assert trend_body["provider"] == "llm-unavailable"
     assert trend_body["planner_provider"] == "local-rule-planner"
     assert trend_body["trend_summary"]["avg_sleep_7d"] is not None
-    assert "sleep-health education and trend observation only" in trend_body["answer"]
+    assert "no generated AI answer was produced" in trend_body["answer"]
     assert "possible_rls_pattern" in trend_body["trend_summary"]["risk_flags"]
     assert trend_body["external_model_used"] is False
     assert trend_body["selected_templates"]
@@ -407,7 +407,7 @@ def test_sleep_agent_returns_bounded_trend_and_rls_answer(client: TestClient) ->
     )
     assert rls.status_code == 200, rls.text
     body = rls.json()
-    assert "Restless Legs Syndrome" in body["answer"]
+    assert "no generated AI answer was produced" in body["answer"]
     assert body["safety_limits"]
     assert body["rls_screening"]["status"] == "possible_rls_pattern"
     assert body["knowledge_snippets"]

@@ -107,7 +107,6 @@ def build_sleep_agent_response(
         rls_followups,
         personal_baseline,
     )
-    local_answer = enforce_guardrails(_sections_to_answer(answer_sections))
     data_used = _data_used(context)
 
     external_answer = None
@@ -133,16 +132,30 @@ def build_sleep_agent_response(
                     summary=external_model_error,
                 )
             )
+    elif is_forbidden_request(red_flags):
+        external_model_error = "External model was not called because the request crossed a medical decision boundary."
+    else:
+        external_model_error = "External model is disabled or not configured; no generated AI answer was produced."
+
+    if is_forbidden_request(red_flags) and not external_answer:
+        answer = forbidden_request_response()
+        provider = "safety-boundary"
+    elif external_answer:
+        answer = external_answer
+        provider = settings.deepseek_model
+    else:
+        answer = external_model_error
+        provider = "llm-unavailable"
 
     return SleepAgentResponse(
         mode=payload.mode,
-        provider=settings.deepseek_model if external_answer else "local-safety-agent",
+        provider=provider,
         planner_provider=planner_provider,
         hitl_required=plan.hitl_required,
-        answer=external_answer or local_answer,
+        answer=answer,
         answer_sections=answer_sections,
         education_prescription=education_prescription,
-        rls_follow_up_questions=rls_followups if plan.topic == "rls" else [],
+        rls_follow_up_questions=rls_followups,
         personal_baseline=personal_baseline,
         user_memory=user_memory,
         plan=plan,
@@ -247,18 +260,6 @@ def _compose_answer_sections(
         low_risk_suggestions=suggestions,
         follow_up_questions=followups,
         care_boundary=boundary,
-    )
-
-
-def _sections_to_answer(sections: SleepAgentAnswerSections) -> str:
-    suggestion_text = " ".join(f"- {item}" for item in sections.low_risk_suggestions)
-    question_text = " ".join(f"- {item}" for item in sections.follow_up_questions)
-    return (
-        f"Trend observation: {sections.trend_observation} "
-        f"What it may mean: {sections.interpretation} "
-        f"Low-risk next steps: {suggestion_text} "
-        f"Follow-up questions: {question_text} "
-        f"Care boundary: {sections.care_boundary}"
     )
 
 
@@ -431,7 +432,7 @@ def _call_deepseek(payload, trend_summary, templates, rls_result, red_flags, kno
         {
             "model": settings.deepseek_model,
             "messages": [
-                {"role": "system", "content": "You are a cautious sleep-health education agent for a non-diagnostic screening app."},
+                {"role": "system", "content": _mode_system_prompt(payload.mode)},
                 {"role": "user", "content": json.dumps(prompt)},
             ],
             "stream": False,
@@ -473,22 +474,64 @@ def _compact_error(message: str) -> str:
     return " ".join(message.split())[:500]
 
 
+def _mode_system_prompt(mode: str) -> str:
+    shared = (
+        "You are Restleg's sleep-health education agent. Generate the answer from the provided structured context, not from canned text. "
+        "Always use the RLS screening context, RLS follow-up questions, selected guide items, trend summary, safety flags, and knowledge snippets when they are present. "
+        "Do not diagnose, prescribe, recommend medication or iron dosing, adjust CPAP/device settings, or tell the user what device to buy. "
+        "If the user asks for individualized medical decisions, explain the boundary and suggest clinician review. "
+        "Keep the answer practical, concise, and clearly educational."
+    )
+    prompts = {
+        "question": (
+            "Mode: question. Directly answer the user's question first, then connect it to the available RLS data and sleep trend context. "
+            "End with 2-4 follow-up questions or tracking items."
+        ),
+        "trend": (
+            "Mode: trend. Focus on what the sleep trend data shows, what patterns are uncertain, and what extra RLS/symptom data would make the trend more useful. "
+            "Avoid pretending that sparse data proves a condition."
+        ),
+        "guide": (
+            "Mode: guide. Build a short low-risk action guide using the selected guide items, RLS screening context, and safety limits. "
+            "Separate immediate tracking steps from clinician-preparation notes."
+        ),
+        "auto": (
+            "Mode: auto. Choose the most relevant balance of question answering, trend interpretation, and low-risk guidance from the structured context."
+        ),
+    }
+    return f"{shared} {prompts.get(mode, prompts['auto'])}"
+
+
 def _build_structured_explanation_prompt(payload, trend_summary, templates, rls_result, red_flags, knowledge_snippets, plan) -> dict[str, Any]:
+    mode_instructions = {
+        "question": "Answer the user's question using the RLS screening data, trend summary, guide items, and safety limits as context.",
+        "trend": "Analyze the trend summary first, then explain how RLS screening data and guide items should be tracked alongside the trend.",
+        "guide": "Create a low-risk guide that includes RLS tracking, relevant sleep-health guide items, and clinician-review boundaries.",
+        "auto": "Choose the best response shape from the question, trend, RLS data, and guide context.",
+    }
     return {
         "mode": payload.mode,
         "question": payload.question,
+        "mode_prompt": mode_instructions.get(payload.mode, mode_instructions["auto"]),
         "plan": plan.model_dump() if plan else None,
         "trend_summary": trend_summary.model_dump(),
         "selected_templates": [item.model_dump() for item in templates],
         "rls_screening": rls_result.model_dump() if rls_result else None,
+        "rls_educational_criteria": [
+            "urge_to_move",
+            "worse_at_rest",
+            "relieved_by_movement",
+            "evening_or_night",
+            "not_better_explained_by_mimics",
+        ],
         "red_flags": red_flags,
         "knowledge_snippets": [item.model_dump() for item in knowledge_snippets],
         "knowledge_sources": KNOWLEDGE_SOURCES,
         "model_boundary": STRUCTURED_ONLY_NOTICE,
         "planner_boundary": PLANNER_BOUNDARY,
         "instruction": (
-            "Rewrite the structured analysis into concise educational sleep-health guidance. "
-            "Never diagnose, prescribe, recommend drugs, iron, CPAP settings, or device purchase."
+            "Generate the user-facing answer from this prompt and structured context. "
+            "Do not reuse fixed template prose as the answer. Never diagnose, prescribe, recommend drugs, iron, CPAP settings, or device purchase."
         ),
         "allowed_outputs": load_safety_rules()["allowed_outputs"],
     }

@@ -3,40 +3,32 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var store: ScreeningStore
-    @State private var isAgentPresented = false
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            TabView {
-                if store.hasCompletedOnboarding {
-                    ScreeningView()
-                        .tabItem {
-                            Label("Screen", systemImage: "waveform.path.ecg")
-                        }
-                } else {
-                    OnboardingView()
-                        .tabItem {
-                            Label("Baseline", systemImage: "checklist")
-                        }
-                }
-
-                SleepHubView()
+        TabView {
+            if store.hasCompletedOnboarding {
+                ScreeningView()
                     .tabItem {
-                        Label("Sleep", systemImage: "chart.line.uptrend.xyaxis")
+                        Label("Screen", systemImage: "waveform.path.ecg")
+                    }
+            } else {
+                OnboardingView()
+                    .tabItem {
+                        Label("Baseline", systemImage: "checklist")
                     }
             }
-            .tint(RestlegTheme.green)
 
-            FloatingAgentButton {
-                isAgentPresented = true
-            }
-        }
-        .sheet(isPresented: $isAgentPresented) {
             AgentView()
-                .environmentObject(store)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .tabItem {
+                    Label("Agent", systemImage: "brain.head.profile")
+                }
+
+            SleepHubView()
+                .tabItem {
+                    Label("Sleep", systemImage: "chart.line.uptrend.xyaxis")
+                }
         }
+        .tint(RestlegTheme.green)
     }
 }
 
@@ -74,100 +66,6 @@ private struct SleepHubView: View {
     }
 }
 
-private struct FloatingAgentButton: View {
-    @AppStorage("agentButtonX") private var storedX = 0.0
-    @AppStorage("agentButtonY") private var storedY = 0.0
-
-    let action: () -> Void
-
-    @State private var position: CGPoint?
-    @State private var dragStart: CGPoint?
-
-    var body: some View {
-        GeometryReader { proxy in
-            let buttonSize: CGFloat = 58
-            let safeTop = proxy.safeAreaInsets.top + 18
-            let safeBottom = proxy.size.height - proxy.safeAreaInsets.bottom - 88
-            let safeLeft: CGFloat = 16
-            let safeRight = proxy.size.width - buttonSize - 16
-            let defaultPosition = CGPoint(x: safeRight, y: safeTop)
-            let current = resolvedPosition(defaultPosition: defaultPosition, minX: safeLeft, maxX: safeRight, minY: safeTop, maxY: safeBottom)
-
-            Button(action: action) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [RestlegTheme.teal, RestlegTheme.ink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 27, weight: .semibold))
-                        .foregroundStyle(.white)
-
-                    Image(systemName: "message.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(5)
-                        .background(RestlegTheme.sky.opacity(0.36), in: Circle())
-                        .offset(x: 13, y: -13)
-
-                    Circle()
-                        .fill(RestlegTheme.mint)
-                        .frame(width: 10, height: 10)
-                        .overlay(
-                            Circle()
-                                .stroke(.white.opacity(0.86), lineWidth: 2)
-                        )
-                        .offset(x: 17, y: -2)
-                }
-                .frame(width: buttonSize, height: buttonSize)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.22), radius: 14, x: 0, y: 8)
-                .accessibilityLabel("Open sleep agent")
-            }
-            .buttonStyle(.plain)
-            .position(x: current.x + buttonSize / 2, y: current.y + buttonSize / 2)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        if dragStart == nil {
-                            dragStart = current
-                        }
-                        let origin = dragStart ?? current
-                        position = CGPoint(
-                            x: clamp(origin.x + value.translation.width, safeLeft, safeRight),
-                            y: clamp(origin.y + value.translation.height, safeTop, safeBottom)
-                        )
-                    }
-                    .onEnded { _ in
-                        let final = position ?? current
-                        storedX = final.x
-                        storedY = final.y
-                        dragStart = nil
-                    }
-            )
-        }
-        .ignoresSafeArea(.keyboard)
-    }
-
-    private func resolvedPosition(defaultPosition: CGPoint, minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat) -> CGPoint {
-        if let position {
-            return CGPoint(x: clamp(position.x, minX, maxX), y: clamp(position.y, minY, maxY))
-        }
-        if storedX > 0 || storedY > 0 {
-            return CGPoint(x: clamp(storedX, minX, maxX), y: clamp(storedY, minY, maxY))
-        }
-        return defaultPosition
-    }
-
-    private func clamp(_ value: CGFloat, _ minimum: CGFloat, _ maximum: CGFloat) -> CGFloat {
-        min(max(value, minimum), maximum)
-    }
-}
-
 #Preview {
     ContentView()
         .environmentObject(ScreeningStore())
@@ -175,18 +73,11 @@ private struct FloatingAgentButton: View {
 
 struct AgentView: View {
     @EnvironmentObject private var store: ScreeningStore
-    @AppStorage("agentBaseURL") private var baseURL = "http://127.0.0.1:8000"
-    @AppStorage("agentBearerToken") private var bearerToken = ""
-    @AppStorage("agentEmail") private var email = "demo@example.com"
-    @AppStorage("agentAllowExternalModel") private var allowExternalModel = false
-    @AppStorage("agentUseBackend") private var useBackend = false
 
-    @State private var password = "password123"
     @State private var question = "I am very nervous and cannot fall asleep these days, what's wrong with me?"
     @State private var selectedMode = SleepAgentMode.question
     @State private var response: SleepAgentResponse?
     @State private var isAsking = false
-    @State private var isLoggingIn = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -220,68 +111,6 @@ struct AgentView: View {
             .restlegBackground()
             .navigationTitle("Ask or analyze")
         }
-    }
-
-    private var sourcePanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Agent source", systemImage: "cpu")
-                .font(.headline)
-            Picker("Agent source", selection: $useBackend) {
-                Text("On device").tag(false)
-                Text("Backend debug").tag(true)
-            }
-            .pickerStyle(.segmented)
-            Text(useBackend ? "Backend mode is for development. Keep DeepSeek disabled unless you are intentionally testing the structured explanation layer." : "Default mode runs locally in the app. It does not call FastAPI or send Health data off device.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .panelStyle()
-    }
-
-    private var connectionPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Backend connection", systemImage: "server.rack")
-                .font(.headline)
-            TextField("API base URL", text: $baseURL)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-                .autocorrectionDisabled()
-                .textFieldStyle(.roundedBorder)
-            TextField("Email", text: $email)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.emailAddress)
-                .autocorrectionDisabled()
-                .textFieldStyle(.roundedBorder)
-            SecureField("Password", text: $password)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textFieldStyle(.roundedBorder)
-            Button {
-                Task {
-                    await login()
-                }
-            } label: {
-                HStack {
-                    Label("Login to backend", systemImage: "person.crop.circle.badge.checkmark")
-                    Spacer()
-                    if isLoggingIn {
-                        ProgressView()
-                    }
-                }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .disabled(isLoggingIn || email.isEmpty || password.isEmpty)
-            SecureField("Bearer token from /auth/login", text: $bearerToken)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textFieldStyle(.roundedBorder)
-            Toggle("Allow optional DeepSeek explanation layer", isOn: $allowExternalModel)
-            Text("Default provider remains the local safety agent. Enable the external layer only for intentional debugging with appropriate privacy controls.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .panelStyle()
     }
 
     private var requestPanel: some View {
@@ -364,27 +193,380 @@ struct AgentView: View {
         isAsking = true
         defer { isAsking = false }
 
-        print("Restleg local agent request mode=\(selectedMode.rawValue) question=\(question)")
-        response = LocalSleepAgent.buildResponse(
-            mode: selectedMode,
-            question: selectedMode == .question ? question : nil,
-            form: store.form,
-            history: store.history,
-            baseline: store.baselineResult
-        )
-    }
-
-    private func login() async {
-        errorMessage = nil
-        isLoggingIn = true
-        defer { isLoggingIn = false }
-
         do {
-            let client = SleepAgentClient(baseURL: baseURL, bearerToken: bearerToken)
-            bearerToken = try await client.login(email: email, password: password)
+            let context = LocalSleepAgent.buildResponse(
+                mode: selectedMode,
+                question: question,
+                form: store.form,
+                history: store.history,
+                baseline: store.baselineResult
+            )
+            let client = try DeepSeekDirectClient()
+            let answer = try await client.ask(
+                mode: selectedMode,
+                question: question,
+                context: context,
+                form: store.form,
+                history: store.history,
+                baseline: store.baselineResult
+            )
+            response = context.withGeneratedAnswer(answer, provider: DeepSeekDirectClient.model)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private extension SleepAgentResponse {
+    func withGeneratedAnswer(_ generatedAnswer: String, provider: String) -> SleepAgentResponse {
+        SleepAgentResponse(
+            mode: mode,
+            provider: provider,
+            plannerProvider: "ios-direct-deepseek",
+            hitlRequired: hitlRequired,
+            answer: generatedAnswer,
+            answerSections: answerSections,
+            educationPrescription: educationPrescription,
+            rlsFollowUpQuestions: rlsFollowUpQuestions,
+            plan: plan,
+            toolTrace: toolTrace + [
+                ToolExecution(toolName: "call_external_explanation_model", status: "completed", summary: "Generated answer directly with DeepSeek from on-device structured context.")
+            ],
+            guidePoints: guidePoints,
+            safetyLimits: safetyLimits,
+            escalationSignals: escalationSignals,
+            dataUsed: dataUsed,
+            redFlags: redFlags,
+            rlsScreening: rlsScreening,
+            knowledgeSources: knowledgeSources,
+            externalModelUsed: true,
+            externalModelError: nil
+        )
+    }
+}
+
+private final class DeepSeekDirectClient {
+    static let model = ProcessInfo.processInfo.environment["DEEPSEEK_MODEL"]?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? "deepseek-v4-flash"
+
+    private let apiKey: String
+    private let session: URLSession
+
+    init(session: URLSession = .shared) throws {
+        guard let apiKey = ProcessInfo.processInfo.environment["DEEPSEEK_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !apiKey.isEmpty else {
+            throw DeepSeekDirectClientError.missingAPIKey
+        }
+        self.apiKey = apiKey
+        self.session = session
+    }
+
+    func ask(
+        mode: SleepAgentMode,
+        question: String,
+        context: SleepAgentResponse,
+        form: ScreeningForm,
+        history: [ScreeningRecord],
+        baseline: BaselineScreeningResult?
+    ) async throws -> String {
+        guard let url = URL(string: "https://api.deepseek.com/chat/completions") else {
+            throw DeepSeekDirectClientError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(
+            DeepSeekChatRequest(
+                model: Self.model,
+                messages: [
+                    DeepSeekMessage(role: "system", content: Self.systemPrompt(mode: mode)),
+                    DeepSeekMessage(
+                        role: "user",
+                        content: Self.userPrompt(
+                            mode: mode,
+                            question: question,
+                            context: context,
+                            form: form,
+                            history: history,
+                            baseline: baseline
+                        )
+                    ),
+                ],
+                stream: false,
+                maxTokens: 900,
+                temperature: 0.4
+            )
+        )
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DeepSeekDirectClientError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? "No response body."
+            throw DeepSeekDirectClientError.http(status: httpResponse.statusCode, body: body)
+        }
+        let decoded = try JSONDecoder().decode(DeepSeekChatResponse.self, from: data)
+        guard let content = decoded.choices.first?.message.content.trimmingCharacters(in: .whitespacesAndNewlines), !content.isEmpty else {
+            throw DeepSeekDirectClientError.emptyMessage
+        }
+        return content
+    }
+
+    private static func systemPrompt(mode: SleepAgentMode) -> String {
+        let shared = "You are Restleg's sleep-health education agent. Generate a fresh answer from the provided structured context. Treat the Known user information section as ground truth for this app session. Do not ask the user to repeat any age, sex, body metrics, sleep metrics, questionnaire flags, screening history, baseline, RLS data, or risk result that is already listed there. Ask follow-up questions only for missing facts or subjective details not present in the context. Always use available RLS screening data, RLS follow-up questions, related guide items, sleep trend context, red flags, and safety limits. Do not diagnose, prescribe, recommend medication or iron dosing, adjust CPAP/device settings, or recommend device purchases. If the user asks for medical decisions, set a clear clinician-review boundary."
+        switch mode {
+        case .question:
+            return "\(shared) Mode: question. Answer the user's question first, then connect it to RLS data and sleep context. End with practical follow-up questions or tracking items."
+        case .trend:
+            return "\(shared) Mode: trend. Focus on sleep trend interpretation, uncertainty, and what RLS/symptom data should be tracked alongside the trend."
+        case .guide:
+            return "\(shared) Mode: guide. Build a low-risk guide with immediate tracking steps and clinician-preparation notes."
+        }
+    }
+
+    private static func userPrompt(
+        mode: SleepAgentMode,
+        question: String,
+        context: SleepAgentResponse,
+        form: ScreeningForm,
+        history: [ScreeningRecord],
+        baseline: BaselineScreeningResult?
+    ) -> String {
+        let sections = context.answerSections
+        let rls = context.rlsScreening
+        return """
+        Mode: \(mode.rawValue)
+        User question: \(question)
+
+        Known user information - use this directly and do not ask again for listed fields:
+        \(knownUserInformation(form: form, history: history, baseline: baseline))
+
+        Structured sleep context:
+        - Trend observation: \(sections?.trendObservation ?? "No trend observation available.")
+        - Internal interpretation context: \(sections?.interpretation ?? "No interpretation context available.")
+        - Care boundary: \(sections?.careBoundary ?? "Education only; clinician review for persistent, severe, unsafe, medication/device, pregnancy, childhood, anemia/kidney/neurologic, or breathing-pause concerns.")
+
+        RLS data:
+        - Status: \(rls?.status ?? "not_available")
+        - Explanation: \(rls?.explanation ?? "No RLS screening available.")
+        - Matched features: \(rls?.matchedFeatures.joined(separator: ", ") ?? "none")
+        - Follow-up questions: \(context.rlsFollowUpQuestions.map(\.question).joined(separator: " | "))
+
+        Related guide items:
+        \(context.guidePoints.map { "- \($0)" }.joined(separator: "\n"))
+
+        Safety limits:
+        \(context.safetyLimits.map { "- \($0)" }.joined(separator: "\n"))
+
+        Red flags:
+        \(context.redFlags.isEmpty ? "none" : context.redFlags.joined(separator: ", "))
+
+        Data used:
+        \(context.dataUsed.joined(separator: ", "))
+
+        Write the final answer for the user. Do not copy the structured context verbatim; use it to reason and respond naturally.
+        """
+    }
+
+    private static func knownUserInformation(
+        form: ScreeningForm,
+        history: [ScreeningRecord],
+        baseline: BaselineScreeningResult?
+    ) -> String {
+        var lines: [String] = []
+
+        appendLine("Age", value: formatNumber(form.age, digits: 0), to: &lines)
+        appendLine("Sex", value: form.sex?.nonEmpty, to: &lines)
+        appendLine("Height", value: formatNumber(form.heightCm, digits: 0, suffix: " cm"), to: &lines)
+        appendLine("Weight", value: formatNumber(form.weightKg, digits: 1, suffix: " kg"), to: &lines)
+        appendLine("BMI", value: bmi(heightCm: form.heightCm, weightKg: form.weightKg), to: &lines)
+
+        appendLine("Current sleep session end", value: formatDateTime(form.sleepSessionEndDate), to: &lines)
+        appendLine("Sleep duration", value: formatDuration(form.sleepDurationMinutes), to: &lines)
+        appendLine("Sleep efficiency", value: formatNumber(form.sleepEfficiency, digits: 0, suffix: "%"), to: &lines)
+        appendLine("Wake after sleep onset", value: formatNumber(form.wasoMinutes, digits: 0, suffix: " min"), to: &lines)
+        appendLine("Sleep latency", value: formatNumber(form.sleepLatencyMinutes, digits: 0, suffix: " min"), to: &lines)
+        appendLine("REM latency", value: formatNumber(form.remLatencyMinutes, digits: 0, suffix: " min"), to: &lines)
+        appendLine("Awake stage time", value: formatNumber(form.awakeStageMinutes, digits: 0, suffix: " min"), to: &lines)
+        appendLine("Light sleep", value: formatStage(minutes: form.lightSleepMinutes, percent: form.lightSleepPercent), to: &lines)
+        appendLine("Deep sleep", value: formatStage(minutes: form.deepSleepMinutes, percent: form.deepSleepPercent), to: &lines)
+        appendLine("REM sleep", value: formatStage(minutes: form.remSleepMinutes, percent: form.remSleepPercent), to: &lines)
+        appendLine("Average SpO2", value: formatNumber(form.averageSpO2, digits: 0, suffix: "%"), to: &lines)
+        appendLine("Minimum SpO2", value: formatNumber(form.minimumSpO2, digits: 0, suffix: "%"), to: &lines)
+        appendLine("Resting heart rate", value: formatNumber(form.restingHeartRate, digits: 0, suffix: " bpm"), to: &lines)
+        appendLine("Mean heart rate", value: formatNumber(form.meanHeartRate, digits: 0, suffix: " bpm"), to: &lines)
+
+        appendLine("Family history of RLS", value: yesNo(form.familyHistoryRLS), to: &lines)
+        appendLine("Diabetes", value: yesNo(form.diabetes), to: &lines)
+        appendLine("Psychiatric medication", value: yesNo(form.psychiatricMedication), to: &lines)
+        appendLine("Non-leg symptoms reported", value: yesNo(form.nonLegSymptoms), to: &lines)
+
+        if let latest = history.max(by: { $0.createdAt < $1.createdAt }) {
+            lines.append("- Saved screening records: \(history.count)")
+            lines.append("- Latest screening result: \(latest.riskLevel) risk, score \(formatNumber(latest.riskScore, digits: 2) ?? "unknown"), tier \(latest.tier), created \(formatDateTime(latest.createdAt) ?? "unknown")")
+            appendLine("Latest screening model", value: latest.modelKey ?? latest.scenario, to: &lines)
+        } else {
+            lines.append("- Saved screening records: none")
+        }
+
+        if let baseline {
+            lines.append("- Baseline: \(baseline.validNightCount) usable nights over \(baseline.windowDays) days, data quality \(baseline.dataQuality.title)")
+            appendLine("Baseline date range", value: baseline.dateRangeLabel, to: &lines)
+            appendLine("Baseline typical risk score", value: formatNumber(baseline.typicalScore, digits: 2), to: &lines)
+            appendLine("Baseline mean risk score", value: formatNumber(baseline.meanScore, digits: 2), to: &lines)
+            appendLine("Baseline 75th percentile risk score", value: formatNumber(baseline.p75Score, digits: 2), to: &lines)
+            appendLine("Baseline risk level", value: baseline.riskLevel?.title, to: &lines)
+            lines.append("- Baseline high-risk nights: \(baseline.highRiskNightCount)")
+        } else {
+            lines.append("- Baseline: not available")
+        }
+
+        if lines.isEmpty {
+            return "- No specific profile or sleep fields are currently available. Ask only for details needed to answer the user's question."
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func appendLine(_ label: String, value: String?, to lines: inout [String]) {
+        guard let value, !value.isEmpty else {
+            return
+        }
+        lines.append("- \(label): \(value)")
+    }
+
+    private static func yesNo(_ value: Bool?) -> String? {
+        guard let value else {
+            return nil
+        }
+        return value ? "yes" : "no"
+    }
+
+    private static func formatNumber(_ value: Double?, digits: Int, suffix: String = "") -> String? {
+        guard let value, value.isFinite else {
+            return nil
+        }
+        return String(format: "%.\(digits)f%@", value, suffix)
+    }
+
+    private static func formatDuration(_ minutes: Double?) -> String? {
+        guard let minutes, minutes.isFinite else {
+            return nil
+        }
+        return SleepTrendAnalysis.formatDuration(minutes: minutes)
+    }
+
+    private static func formatStage(minutes: Double?, percent: Double?) -> String? {
+        let time = formatDuration(minutes)
+        let share = formatNumber(percent, digits: 0, suffix: "%")
+        switch (time, share) {
+        case let (time?, share?):
+            return "\(time), \(share)"
+        case let (time?, nil):
+            return time
+        case let (nil, share?):
+            return share
+        case (nil, nil):
+            return nil
+        }
+    }
+
+    private static func bmi(heightCm: Double?, weightKg: Double?) -> String? {
+        guard
+            let heightCm,
+            let weightKg,
+            heightCm > 0,
+            weightKg > 0
+        else {
+            return nil
+        }
+        let heightM = heightCm / 100
+        return formatNumber(weightKg / (heightM * heightM), digits: 1)
+    }
+
+    private static func formatDateTime(_ date: Date?) -> String? {
+        guard let date else {
+            return nil
+        }
+        return dateTimeFormatter.string(from: date)
+    }
+
+    private static let dateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+}
+
+private struct DeepSeekChatRequest: Encodable {
+    let model: String
+    let messages: [DeepSeekMessage]
+    let stream: Bool
+    let maxTokens: Int
+    let temperature: Double
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case messages
+        case stream
+        case maxTokens = "max_tokens"
+        case temperature
+    }
+}
+
+private struct DeepSeekMessage: Codable {
+    let role: String
+    let content: String
+    let reasoningContent: String?
+
+    init(role: String, content: String, reasoningContent: String? = nil) {
+        self.role = role
+        self.content = content
+        self.reasoningContent = reasoningContent
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case role
+        case content
+        case reasoningContent = "reasoning_content"
+    }
+}
+
+private struct DeepSeekChatResponse: Decodable {
+    let choices: [DeepSeekChoice]
+}
+
+private struct DeepSeekChoice: Decodable {
+    let message: DeepSeekMessage
+}
+
+private enum DeepSeekDirectClientError: LocalizedError {
+    case missingAPIKey
+    case invalidURL
+    case invalidResponse
+    case emptyMessage
+    case http(status: Int, body: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingAPIKey:
+            return "DeepSeek API key is missing from the Xcode run environment."
+        case .invalidURL:
+            return "DeepSeek API URL is invalid."
+        case .invalidResponse:
+            return "DeepSeek API returned an invalid response."
+        case .emptyMessage:
+            return "DeepSeek returned an empty message."
+        case let .http(status, body):
+            return "DeepSeek HTTP \(status): \(body)"
+        }
+    }
+}
+
+private extension String {
+    var nonEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 
@@ -393,20 +575,134 @@ private struct AgentResponseView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            AnswerCard(title: "AI reply", systemImage: "sparkles", items: [("Response", response.answer)])
+
+            if let rlsScreening = response.rlsScreening {
+                RLSContextCard(screening: rlsScreening, followUps: response.rlsFollowUpQuestions)
+            }
+
+            if !response.guidePoints.isEmpty {
+                GuideContextCard(items: response.guidePoints, safetyLimits: response.safetyLimits)
+            }
+
             if let sections = response.answerSections {
-                AnswerCard(
-                    title: "Answers",
-                    systemImage: "text.bubble",
-                    items: [
-                        ("Trend", sections.trendObservation),
-                        ("What this may mean", sections.interpretation),
-                    ]
-                )
-                AdviceCard(sections: sections)
-            } else {
-                AnswerCard(title: "Answers", systemImage: "text.bubble", items: [("Response", response.answer)])
+                AgentContextSummaryCard(sections: sections)
+            }
+
+            AgentRunInfoCard(response: response)
+        }
+    }
+}
+
+private struct RLSContextCard: View {
+    let screening: RlsScreeningResult
+    let followUps: [RLSFollowUpQuestion]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("RLS data", systemImage: "waveform.path.ecg.rectangle")
+                .font(.headline)
+                .foregroundStyle(RestlegTheme.ink)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(screening.status.replacingOccurrences(of: "_", with: " ").capitalized)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(RestlegTheme.blue)
+                Text(screening.explanation)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !screening.matchedFeatures.isEmpty {
+                Text(screening.matchedFeatures.joined(separator: ", "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if !followUps.isEmpty {
+                Divider()
+                ForEach(followUps) { item in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label(item.criterion.replacingOccurrences(of: "_", with: " ").capitalized, systemImage: item.answered ? "checkmark.circle.fill" : "questionmark.circle")
+                            .font(.footnote.weight(.semibold))
+                        Text(item.question)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
+        .panelStyle()
+    }
+}
+
+private struct GuideContextCard: View {
+    let items: [String]
+    let safetyLimits: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Related guide", systemImage: "list.clipboard")
+                .font(.headline)
+                .foregroundStyle(RestlegTheme.ink)
+            ForEach(items, id: \.self) { item in
+                Label(item, systemImage: "checkmark.circle.fill")
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !safetyLimits.isEmpty {
+                Divider()
+                ForEach(safetyLimits, id: \.self) { item in
+                    Label(item, systemImage: "shield")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .panelStyle()
+    }
+}
+
+private struct AgentContextSummaryCard: View {
+    let sections: AgentAnswerSections
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Structured context", systemImage: "square.stack.3d.up")
+                .font(.headline)
+                .foregroundStyle(RestlegTheme.ink)
+            Text(sections.trendObservation)
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(sections.careBoundary)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .panelStyle()
+    }
+}
+
+private struct AgentRunInfoCard: View {
+    let response: SleepAgentResponse
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Run info", systemImage: "info.circle")
+                .font(.headline)
+                .foregroundStyle(RestlegTheme.ink)
+            Text("Provider: \(response.provider)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Planner: \(response.plannerProvider)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let externalModelError = response.externalModelError {
+                Text(externalModelError)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .panelStyle()
     }
 }
 
@@ -425,15 +721,31 @@ private struct AnswerCard: View {
                     Text(label)
                         .font(.caption.weight(.bold))
                         .foregroundStyle(RestlegTheme.blue)
-                    Text(text)
-                        .font(.subheadline)
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    MarkdownText(text: text)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .panelStyle()
+    }
+}
+
+private struct MarkdownText: View {
+    let text: String
+
+    var body: some View {
+        Text(attributedText)
+            .font(.subheadline)
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+            .textSelection(.enabled)
+    }
+
+    private var attributedText: AttributedString {
+        (try? AttributedString(
+            markdown: text,
+            options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(text)
     }
 }
 
@@ -1018,126 +1330,10 @@ private extension SleepAgentMode {
     }
 }
 
-private final class SleepAgentClient {
-    private let baseURL: String
-    private let bearerToken: String
-    private let session: URLSession
-
-    init(baseURL: String, bearerToken: String, session: URLSession = .shared) {
-        self.baseURL = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        self.bearerToken = bearerToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.session = session
-    }
-
-    func login(email: String, password: String) async throws -> String {
-        guard let url = URL(string: "\(baseURL)/auth/login") else {
-            throw SleepAgentClientError.invalidBaseURL
-        }
-
-        let payload = LoginRequest(email: email, password: password)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(payload)
-
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SleepAgentClientError.invalidResponse
-        }
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SleepAgentClientError.http(status: httpResponse.statusCode, body: Self.errorBody(from: data))
-        }
-        return try JSONDecoder().decode(LoginResponse.self, from: data).accessToken
-    }
-
-    func ask(
-        mode: SleepAgentMode,
-        question: String?,
-        includeLatestData: Bool,
-        allowExternalModel: Bool
-    ) async throws -> SleepAgentResponse {
-        guard let url = URL(string: "\(baseURL)/agent/sleep") else {
-            throw SleepAgentClientError.invalidBaseURL
-        }
-
-        let payload = SleepAgentRequest(
-            mode: mode,
-            question: question,
-            includeLatestData: includeLatestData,
-            allowExternalModel: allowExternalModel
-        )
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(payload)
-
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SleepAgentClientError.invalidResponse
-        }
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SleepAgentClientError.http(status: httpResponse.statusCode, body: Self.errorBody(from: data))
-        }
-        return try JSONDecoder().decode(SleepAgentResponse.self, from: data)
-    }
-
-    private static func errorBody(from data: Data) -> String {
-        guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
-            return "No response body."
-        }
-        return text
-    }
-}
-
-private enum SleepAgentClientError: LocalizedError {
-    case invalidBaseURL
-    case invalidResponse
-    case http(status: Int, body: String)
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidBaseURL:
-            return "Agent API base URL is invalid."
-        case .invalidResponse:
-            return "Agent API returned an invalid response."
-        case let .http(status, body):
-            return "Agent API HTTP \(status): \(body)"
-        }
-    }
-}
-
 private enum SleepAgentMode: String, Codable, CaseIterable, Hashable {
     case trend
     case guide
     case question
-}
-
-private struct LoginRequest: Encodable {
-    let email: String
-    let password: String
-}
-
-private struct LoginResponse: Decodable {
-    let accessToken: String
-
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-    }
-}
-
-private struct SleepAgentRequest: Encodable {
-    let mode: SleepAgentMode
-    let question: String?
-    let includeLatestData: Bool
-    let allowExternalModel: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case mode
-        case question
-        case includeLatestData = "include_latest_data"
-        case allowExternalModel = "allow_external_model"
-    }
 }
 
 private struct SleepAgentResponse: Decodable {
