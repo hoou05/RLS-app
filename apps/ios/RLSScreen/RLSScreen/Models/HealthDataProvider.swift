@@ -315,7 +315,10 @@ final class HealthKitDataProvider: HealthDataProvider {
                     await onUpdate()
                     completionHandler()
                     if backgroundTask != .invalid {
-                        UIApplication.shared.endBackgroundTask(backgroundTask)
+                        let taskToEnd = backgroundTask
+                        await MainActor.run {
+                            UIApplication.shared.endBackgroundTask(taskToEnd)
+                        }
                     }
                 }
             }

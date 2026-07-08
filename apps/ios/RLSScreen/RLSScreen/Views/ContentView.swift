@@ -49,21 +49,27 @@ private struct SleepHubView: View {
     @State private var section = SleepHubSection.trends
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Sleep view", selection: $section) {
-                Text("Trends").tag(SleepHubSection.trends)
-                Text("History").tag(SleepHubSection.history)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .background(RestlegTheme.background)
+        NavigationStack {
+            VStack(spacing: 0) {
+                Picker("Sleep view", selection: $section) {
+                    Text("Trends").tag(SleepHubSection.trends)
+                    Text("History").tag(SleepHubSection.history)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
 
-            if section == .trends {
-                SleepAnalysisView()
-            } else {
-                HistoryView()
+                Group {
+                    if section == .trends {
+                        SleepAnalysisView()
+                    } else {
+                        HistoryView()
+                    }
+                }
             }
+            .restlegBackground()
+            .navigationTitle("Sleep")
         }
     }
 }
@@ -88,7 +94,7 @@ private struct FloatingAgentButton: View {
             let current = resolvedPosition(defaultPosition: defaultPosition, minX: safeLeft, maxX: safeRight, minY: safeTop, maxY: safeBottom)
 
             Button(action: action) {
-                ZStack(alignment: .topTrailing) {
+                ZStack {
                     Circle()
                         .fill(
                             LinearGradient(
@@ -100,21 +106,25 @@ private struct FloatingAgentButton: View {
                     Image(systemName: "brain.head.profile")
                         .font(.system(size: 27, weight: .semibold))
                         .foregroundStyle(.white)
+
                     Image(systemName: "message.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(RestlegTheme.mint)
-                        .offset(x: 16, y: 14)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(5)
+                        .background(RestlegTheme.sky.opacity(0.36), in: Circle())
+                        .offset(x: 13, y: -13)
+
                     Circle()
-                        .fill(.white)
-                        .frame(width: 14, height: 14)
+                        .fill(RestlegTheme.mint)
+                        .frame(width: 10, height: 10)
                         .overlay(
                             Circle()
-                                .fill(RestlegTheme.teal)
-                                .frame(width: 8, height: 8)
+                                .stroke(.white.opacity(0.86), lineWidth: 2)
                         )
-                        .offset(x: -4, y: 4)
+                        .offset(x: 17, y: -2)
                 }
                 .frame(width: buttonSize, height: buttonSize)
+                .clipShape(Circle())
                 .shadow(color: .black.opacity(0.22), radius: 14, x: 0, y: 8)
                 .accessibilityLabel("Open sleep agent")
             }
@@ -181,31 +191,31 @@ struct AgentView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    requestPanel
+            ScrollViewReader { reader in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        requestPanel
 
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.red)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    if let response {
-                        AgentResponseView(response: response)
-                    } else {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("Ready", systemImage: "message")
-                                .font(.headline)
-                            Text("Ask about sleep trends, trouble falling asleep, RLS-style leg discomfort, snoring, or safe next steps.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .panelStyle()
+
+                        if let response {
+                            AgentResponseView(response: response)
+                                .id("agent-response")
+                        }
+                    }
+                    .padding(16)
+                }
+                .onChange(of: response?.answer) {
+                    guard response != nil else { return }
+                    withAnimation(.snappy) {
+                        reader.scrollTo("agent-response", anchor: .top)
                     }
                 }
-                .padding(16)
             }
             .restlegBackground()
             .navigationTitle("Ask or analyze")
@@ -276,9 +286,24 @@ struct AgentView: View {
 
     private var requestPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Ask or analyze", systemImage: "text.bubble")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(RestlegTheme.ink)
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        LinearGradient(colors: [RestlegTheme.teal, RestlegTheme.navy], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ask or analyze")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(RestlegTheme.ink)
+                    Text("Trends, sleep trouble, RLS symptoms, and safe next steps")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Picker("Mode", selection: $selectedMode) {
                 Text("Question").tag(SleepAgentMode.question)
                 Text("Trend").tag(SleepAgentMode.trend)
@@ -288,7 +313,9 @@ struct AgentView: View {
 
             TextEditor(text: $question)
                 .frame(minHeight: 110)
-                .padding(8)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(10)
                 .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
@@ -305,7 +332,7 @@ struct AgentView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(RestlegTheme.green)
+                .tint(RestlegTheme.navy)
                 .controlSize(.large)
                 .disabled(isAsking)
 
@@ -314,7 +341,7 @@ struct AgentView: View {
                 }
             }
 
-            Text("Education only. Restleg can help organize sleep information and safe questions, but it does not diagnose or prescribe treatment.")
+            Text("Restleg can organize patterns and next questions. It does not diagnose or prescribe treatment.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -365,167 +392,83 @@ private struct AgentResponseView: View {
     let response: SleepAgentResponse
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Agent response", systemImage: "sparkles")
-                    .font(.headline)
-                if let sections = response.answerSections {
-                    AgentAnswerSectionsView(sections: sections)
-                } else {
-                    Text(response.answer)
-                        .font(.body)
+        VStack(alignment: .leading, spacing: 12) {
+            if let sections = response.answerSections {
+                AnswerCard(
+                    title: "Answers",
+                    systemImage: "text.bubble",
+                    items: [
+                        ("Trend", sections.trendObservation),
+                        ("What this may mean", sections.interpretation),
+                    ]
+                )
+                AdviceCard(sections: sections)
+            } else {
+                AnswerCard(title: "Answers", systemImage: "text.bubble", items: [("Response", response.answer)])
+            }
+        }
+    }
+}
+
+private struct AnswerCard: View {
+    let title: String
+    let systemImage: String
+    let items: [(String, String)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+                .foregroundStyle(RestlegTheme.ink)
+            ForEach(items, id: \.0) { label, text in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(label)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(RestlegTheme.blue)
+                    Text(text)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-
-            if let prescription = response.educationPrescription {
-                EducationPrescriptionView(prescription: prescription)
-            }
-
-            if !response.rlsFollowUpQuestions.isEmpty {
-                RLSFollowUpView(items: response.rlsFollowUpQuestions)
-            }
-
-            AgentListSection(title: "Red flags", items: response.redFlags, empty: "No immediate red-flag signals surfaced.")
-            AgentListSection(title: "Safety limits", items: response.safetyLimits, empty: "No safety limits returned.")
-
-            if let screening = response.rlsScreening {
-                DisclosureGroup("RLS screening helper") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(screening.status.capitalized)
-                            .font(.subheadline.weight(.semibold))
-                        Text(screening.explanation)
-                            .foregroundStyle(.secondary)
-                        if !screening.matchedFeatures.isEmpty {
-                            Text(screening.matchedFeatures.joined(separator: ", "))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.top, 8)
-                }
-            }
-
-            if let externalModelError = response.externalModelError {
-                Text(externalModelError)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.orange)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .panelStyle()
     }
 }
 
-private struct AgentAnswerSectionsView: View {
+private struct AdviceCard: View {
     let sections: AgentAnswerSections
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            PrescriptionMiniBlock(title: "Trend observation", text: sections.trendObservation, systemImage: "chart.line.uptrend.xyaxis")
-            PrescriptionMiniBlock(title: "What it may mean", text: sections.interpretation, systemImage: "lightbulb")
-            AgentListSection(title: "Low-risk next steps", items: sections.lowRiskSuggestions, empty: "No low-risk suggestions returned.")
-            AgentListSection(title: "Follow-up questions", items: sections.followUpQuestions, empty: "No follow-up questions returned.")
-            PrescriptionMiniBlock(title: "Care boundary", text: sections.careBoundary, systemImage: "cross.case")
-        }
-    }
-}
-
-private struct PrescriptionMiniBlock: View {
-    let title: String
-    let text: String
-    let systemImage: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(title, systemImage: systemImage)
-                .font(.subheadline.weight(.semibold))
-            Text(text)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-private struct EducationPrescriptionView: View {
-    let prescription: HealthEducationPrescription
-
-    var body: some View {
-        DisclosureGroup("Health education prescription") {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(prescription.title)
-                    .font(.headline)
-                Text(prescription.targetUser)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                PrescriptionMiniBlock(title: "Health problem", text: prescription.healthProblem, systemImage: "doc.text")
-                PrescriptionMiniBlock(title: "Use instructions", text: prescription.useInstructions, systemImage: "checklist")
-                AgentListSection(title: "Symptoms to track", items: prescription.keySymptomsToTrack, empty: "No symptom items returned.")
-                AgentListSection(title: "Risk factors to review", items: prescription.riskFactorsToReview, empty: "No risk factors returned.")
-                AgentListSection(title: "Guidance items", items: prescription.guidanceItems, empty: "No guidance items returned.")
-                AgentListSection(title: "Other guidance", items: prescription.otherGuidance, empty: "No additional guidance returned.")
-                PrescriptionMiniBlock(title: "Safety scope", text: prescription.safetyScope, systemImage: "shield")
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Guidance / Advice", systemImage: "checklist")
+                .font(.headline)
+                .foregroundStyle(RestlegTheme.ink)
+            ForEach(sections.lowRiskSuggestions, id: \.self) { item in
+                Label(item, systemImage: "checkmark.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.top, 8)
-        }
-    }
-}
-
-private struct RLSFollowUpView: View {
-    let items: [RLSFollowUpQuestion]
-
-    var body: some View {
-        DisclosureGroup("RLS five-feature follow-up") {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(items) { item in
-                    VStack(alignment: .leading, spacing: 5) {
-                        Label(item.criterion.replacingOccurrences(of: "_", with: " ").capitalized, systemImage: item.answered ? "checkmark.circle.fill" : "questionmark.circle")
-                            .font(.subheadline.weight(.semibold))
-                        Text(item.question)
-                        Text(item.whyItMatters)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(10)
-                    .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
+            if !sections.followUpQuestions.isEmpty {
+                Divider()
+                Text("Questions to consider")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(RestlegTheme.blue)
+                ForEach(sections.followUpQuestions, id: \.self) { item in
+                    Label(item, systemImage: "questionmark.circle")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.top, 8)
-        }
-    }
-}
-
-private struct AgentMetaGrid: View {
-    let response: SleepAgentResponse
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            AgentMetaTile(title: "Provider", value: response.provider)
-            AgentMetaTile(title: "Planner", value: response.plannerProvider)
-            AgentMetaTile(title: "HITL", value: response.hitlRequired ? "Yes" : "No")
-            AgentMetaTile(title: "External", value: response.externalModelUsed ? "Yes" : "No")
-        }
-    }
-}
-
-private struct AgentMetaTile: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption.weight(.semibold))
+            Text(sections.careBoundary)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .padding(.top, 4)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
+        .panelStyle()
     }
 }
 
@@ -614,8 +557,9 @@ private enum LocalSleepAgent {
             redFlags: redFlags,
             rlsScreening: topic == "rls" ? rlsScreening(question: normalized, form: form) : nil,
             knowledgeSources: [
-                "On-device education prescription boundary summary",
+                "On-device sleep guidance boundary summary",
                 "RLS five-feature screening summary",
+                "General sleep, insomnia, and sleep-breathing guide summaries",
                 "Local sleep trend and screening history",
             ],
             externalModelUsed: false,
@@ -624,7 +568,7 @@ private enum LocalSleepAgent {
     }
 
     private static let safetyLimits = [
-        "Education only: trend review, symptom tracking, low-risk lifestyle suggestions, and clinician-preparation notes.",
+        "Restleg can help with trend review, symptom tracking, low-risk lifestyle suggestions, and notes for a clinician visit.",
         "Not allowed: diagnosis, medication choice or dose, iron treatment instructions, CPAP/device settings, or device purchase decisions.",
         "Clinician review is recommended for severe impairment, breathing pauses, chest pain, drowsy driving, pregnancy, childhood symptoms, anemia, kidney disease, neurologic symptoms, or medication/device questions.",
     ]
@@ -711,23 +655,35 @@ private enum LocalSleepAgent {
         if forbidden {
             return AgentAnswerSections(
                 trendObservation: trendObservation(analysis: analysis, baseline: baseline, form: form),
-                interpretation: "This asks for diagnosis, medication, supplement, device, or treatment decisions. The on-device agent should not make that decision.",
+                interpretation: "This is a treatment-level question, so Restleg should not make that decision for you.",
                 lowRiskSuggestions: [
                     "Write down symptom timing, triggers, sleep disruption, current medications/supplements, and recent Health data to discuss with a clinician.",
                     "Do not change medication, iron treatment, CPAP settings, or treatment devices based on this app.",
                 ],
                 followUpQuestions: topic == "rls" ? followUps.map(\.question) : ["What symptom is most disruptive, how often does it occur, and does it affect daytime function?"],
-                careBoundary: "Please use this as clinician-preparation only. For medication, iron, diagnosis, breathing-device settings, pregnancy, childhood symptoms, or severe impairment, contact a licensed clinician or sleep specialist."
+                careBoundary: "For medication, iron, diagnosis, breathing-device settings, pregnancy, childhood symptoms, or severe impairment, please contact a licensed clinician or sleep specialist."
             )
         }
 
         return AgentAnswerSections(
-            trendObservation: trendObservation(analysis: analysis, baseline: baseline, form: form),
-            interpretation: interpretation(topic: topic, form: form, analysis: analysis),
-            lowRiskSuggestions: lowRiskSuggestions(topic: topic, analysis: analysis),
-            followUpQuestions: topic == "rls" ? followUps.map(\.question) : defaultFollowUps(topic: topic),
+            trendObservation: trendObservation(mode: mode, analysis: analysis, baseline: baseline, form: form),
+            interpretation: interpretation(mode: mode, topic: topic, form: form, analysis: analysis),
+            lowRiskSuggestions: lowRiskSuggestions(mode: mode, topic: topic, analysis: analysis),
+            followUpQuestions: followUpQuestions(mode: mode, topic: topic, rlsFollowUps: followUps),
             careBoundary: careBoundary(redFlags: redFlags)
         )
+    }
+
+    private static func trendObservation(mode: SleepAgentMode, analysis: SleepTrendAnalysis, baseline: BaselineScreeningResult?, form: ScreeningForm) -> String {
+        let base = trendObservation(analysis: analysis, baseline: baseline, form: form)
+        switch mode {
+        case .question:
+            return "\(base) I am using this only as background context for your question, not as proof of a diagnosis."
+        case .trend:
+            return trendFocusedObservation(analysis: analysis, baseline: baseline, form: form)
+        case .guide:
+            return "\(base) The guide below is built around low-risk sleep habits and tracking steps that are reasonable even when the exact cause is unclear."
+        }
     }
 
     private static func trendObservation(analysis: SleepTrendAnalysis, baseline: BaselineScreeningResult?, form: ScreeningForm) -> String {
@@ -744,38 +700,163 @@ private enum LocalSleepAgent {
         return "No local sleep trend is available yet. Import Health sleep data or complete screenings after sleep sessions to build a baseline."
     }
 
-    private static func interpretation(topic: String, form: ScreeningForm, analysis: SleepTrendAnalysis) -> String {
+    private static func trendFocusedObservation(analysis: SleepTrendAnalysis, baseline: BaselineScreeningResult?, form: ScreeningForm) -> String {
+        var parts: [String] = []
+        if let avg = analysis.averageSleepDurationMinutes {
+            parts.append("Across recent local records, average sleep is \(SleepTrendAnalysis.formatDuration(minutes: avg)).")
+        } else {
+            parts.append("The app does not yet have enough saved sleep-duration records for a stable multi-night trend.")
+        }
+        if let efficiency = analysis.averageSleepEfficiency {
+            parts.append("Average sleep efficiency is \(efficiency.formatted(.number.precision(.fractionLength(0))))%.")
+        }
+        if let change = analysis.sleepDurationChangeMinutes {
+            parts.append("Compared with earlier records, sleep duration changed by \(SleepTrendAnalysis.formatSignedMinutes(change)).")
+        }
+        if analysis.shortSleepNightCount > 0 {
+            parts.append("\(analysis.shortSleepNightCount) recent night(s) were short-sleep nights.")
+        }
+        if analysis.lowEfficiencyNightCount > 0 {
+            parts.append("\(analysis.lowEfficiencyNightCount) recent night(s) had lower efficiency.")
+        }
+        if let baseline {
+            parts.append("Your local baseline currently includes \(baseline.validNightCount) usable night(s).")
+        } else if form.sleepDurationMinutes == nil {
+            parts.append("More Health sleep data will make the trend more useful.")
+        }
+        return parts.joined(separator: " ")
+    }
+
+    private static func interpretation(mode: SleepAgentMode, topic: String, form: ScreeningForm, analysis: SleepTrendAnalysis) -> String {
+        switch mode {
+        case .question:
+            return questionInterpretation(topic: topic, form: form, analysis: analysis)
+        case .trend:
+            return trendInterpretation(topic: topic, analysis: analysis)
+        case .guide:
+            return guideInterpretation(topic: topic)
+        }
+    }
+
+    private static func questionInterpretation(topic: String, form: ScreeningForm, analysis: SleepTrendAnalysis) -> String {
         switch topic {
         case "rls":
-            return "Your question fits an RLS-style education path if the sensation includes an urge to move, worsens during rest, improves with movement, is worse in the evening or night, and is not better explained by cramps, neuropathy, swelling, joint pain, or medication effects. This app cannot confirm RLS."
+            return "This could fit an RLS-like pattern if the sensation includes an urge to move, gets worse during rest, improves with movement, is stronger in the evening or night, and is not better explained by cramps, numbness, swelling, joint pain, or medication effects. Restleg cannot confirm a diagnosis."
         case "osa":
             return "Snoring or sleepiness alone does not diagnose obstructive sleep apnea. Breathing pauses, choking awakenings, morning headaches, low oxygen values, or strong daytime sleepiness are reasons to prepare notes for clinical review."
         case "insomnia":
             return "Feeling nervous or stressed can make it harder to fall asleep by keeping the body alert. That does not mean something is seriously wrong, but if this is new, persistent, or affecting daytime function, it is worth tracking the pattern and considering professional support."
         default:
-            return "The local agent can explain sleep trends and suggest low-risk tracking steps, but it should stay educational and avoid diagnosis or treatment decisions."
+            return "Restleg can explain sleep trends and suggest low-risk tracking steps, while avoiding diagnosis or treatment decisions."
         }
     }
 
-    private static func lowRiskSuggestions(topic: String, analysis: SleepTrendAnalysis) -> [String] {
+    private static func trendInterpretation(topic: String, analysis: SleepTrendAnalysis) -> String {
+        var message = "Trend mode looks for repeated patterns rather than answering a single symptom question."
+        if analysis.shortSleepNightCount > 0 || analysis.lowEfficiencyNightCount > 0 {
+            message += " Recent records show sleep quantity or efficiency nights worth watching, so compare those nights with symptoms, stress, caffeine/alcohol timing, activity, and daytime function."
+        } else {
+            message += " If the chart looks stable, the next useful step is to keep collecting data and mark symptom days so pattern links become clearer."
+        }
+        if topic == "rls" {
+            message += " For leg symptoms, the trend is most useful when paired with evening/rest timing and movement-relief notes."
+        }
+        return message
+    }
+
+    private static func guideInterpretation(topic: String) -> String {
+        switch topic {
+        case "rls":
+            return "Guide mode focuses on practical tracking and comfort-support steps for RLS-style leg discomfort while keeping treatment decisions with a clinician."
+        case "osa":
+            return "Guide mode focuses on recording sleep-breathing warning signs and knowing when formal evaluation is appropriate; it does not screen by device purchase or settings."
+        case "insomnia":
+            return "Guide mode focuses on calming the sleep window, strengthening regular sleep cues, and avoiding self-medication decisions."
+        default:
+            return "Guide mode gives a broad sleep-health routine and tracking checklist that stays low-risk and non-diagnostic."
+        }
+    }
+
+    private static func lowRiskSuggestions(mode: SleepAgentMode, topic: String, analysis: SleepTrendAnalysis) -> [String] {
+        switch mode {
+        case .question:
+            return questionSuggestions(topic: topic, analysis: analysis)
+        case .trend:
+            return trendSuggestions(topic: topic, analysis: analysis)
+        case .guide:
+            return guideSuggestions(topic: topic, analysis: analysis)
+        }
+    }
+
+    private static func questionSuggestions(topic: String, analysis: SleepTrendAnalysis) -> [String] {
         var items = [
-            "Keep a brief 1-2 week log of bedtime, wake time, sleep quality, symptoms, caffeine/alcohol timing, exercise, and daytime sleepiness.",
-            "Use a consistent wake time and a calming wind-down routine; keep the sleep area cool, dark, and quiet.",
+            "For the next few nights, write down when the problem starts, what was happening beforehand, and how it affects the next day.",
+            "Keep the response low-risk tonight: reduce stimulation, avoid clock-watching, and use a quiet reset if you are awake and tense.",
         ]
         if topic == "rls" {
-            items.append("For leg discomfort, record rest timing, evening/night pattern, movement relief, location, severity, and possible mimics such as cramps or numbness.")
+            items.append("For leg discomfort, note whether there is an urge to move, whether rest makes it worse, whether movement helps, and whether it is stronger in the evening or night.")
         }
         if topic == "osa" {
-            items.append("If snoring or breathing symptoms are present, record witnessed pauses, choking awakenings, morning headaches, and daytime sleepiness.")
+            items.append("For snoring or breathing concerns, record witnessed pauses, choking awakenings, morning headaches, and daytime sleepiness.")
         }
         if topic == "insomnia" {
-            items.append("If you cannot fall asleep, avoid clock-watching; try a quiet low-stimulation reset such as slow breathing, gentle stretching, or reading something calm until sleepy.")
-            items.append("Move worries out of bed by writing a short next-day list earlier in the evening, then keep the bed associated with sleep rather than problem-solving.")
+            items.append("If worry is driving the problem, move planning out of bed by writing a short next-day list earlier in the evening.")
         }
         if analysis.shortSleepNightCount > 0 {
             items.append("Because recent short-sleep nights appear in local records, compare symptoms and daytime function on shorter versus longer nights.")
         }
         return items
+    }
+
+    private static func trendSuggestions(topic: String, analysis: SleepTrendAnalysis) -> [String] {
+        var items = [
+            "Collect at least 1-2 weeks of sleep sessions before treating a single night as meaningful.",
+            "Tag nights with stress, caffeine/alcohol timing, late meals, naps, exercise, leg discomfort, snoring, or awakenings so the trend has context.",
+            "Compare short-sleep or low-efficiency nights with daytime sleepiness, mood, concentration, and symptom severity.",
+        ]
+        if analysis.bedTimeRangeMinutes.map({ $0 > 90 }) == true {
+            items.append("Bedtime appears variable; try watching whether a more consistent wake time improves the pattern.")
+        }
+        if topic == "rls" {
+            items.append("For RLS-style symptoms, track whether symptom nights cluster after long sitting, evening rest, poor sleep, or schedule disruption.")
+        }
+        return items
+    }
+
+    private static func guideSuggestions(topic: String, analysis: SleepTrendAnalysis) -> [String] {
+        var items = [
+            "Keep a consistent wake time, then choose a realistic sleep window instead of forcing extra time in bed.",
+            "Build a 30-60 minute wind-down routine with dim light, lower stimulation, and a repeatable cue that the day is ending.",
+            "Keep the bedroom cool, dark, quiet, and comfortable; reserve the bed mainly for sleep and intimacy.",
+            "Avoid late caffeine and heavy alcohol near bedtime; keep late meals and intense late exercise from crowding the sleep window when possible.",
+        ]
+        switch topic {
+        case "rls":
+            items.append("For leg discomfort, gentle stretching or a quiet walk may be reasonable comfort steps; avoid using the app to choose medicines or supplements.")
+            items.append("Prepare a clinician note if symptoms are persistent, spreading, or disrupting sleep: timing, movement relief, evening pattern, current medicines, and possible mimics.")
+        case "osa":
+            items.append("If breathing symptoms are suspected, focus on documenting snoring, witnessed pauses, choking awakenings, oxygen values if available, and daytime sleepiness for clinical review.")
+        case "insomnia":
+            items.append("If you are awake and frustrated, step away from active problem-solving in bed and return when sleepy.")
+            items.append("If insomnia lasts for weeks or affects daytime function, structured behavioral care such as CBT-I is a clinician-supported direction to ask about.")
+        default:
+            items.append("Review screens, work stress, naps, caffeine, alcohol, light exposure, and schedule regularity before assuming a sleep disorder.")
+        }
+        if analysis.shortSleepNightCount > 0 {
+            items.append("Since short-sleep nights appear in local records, prioritize recovery consistency and watch whether daytime function improves.")
+        }
+        return items
+    }
+
+    private static func followUpQuestions(mode: SleepAgentMode, topic: String, rlsFollowUps: [RLSFollowUpQuestion]) -> [String] {
+        switch mode {
+        case .question:
+            return topic == "rls" ? rlsFollowUps.map(\.question) : defaultFollowUps(topic: topic)
+        case .trend:
+            return trendFollowUps(topic: topic)
+        case .guide:
+            return guideFollowUps(topic: topic)
+        }
     }
 
     private static func defaultFollowUps(topic: String) -> [String] {
@@ -789,11 +870,36 @@ private enum LocalSleepAgent {
         }
     }
 
+    private static func trendFollowUps(topic: String) -> [String] {
+        var questions = [
+            "How many nights of Health sleep data are available, and are there obvious missing nights?",
+            "Do the worst sleep nights line up with stress, caffeine, alcohol, naps, late meals, travel, or schedule changes?",
+            "Do daytime sleepiness or concentration problems rise after the short-sleep nights?",
+        ]
+        if topic == "rls" {
+            questions.append("Do leg-symptom nights cluster in the evening or after long periods of sitting still?")
+        }
+        return questions
+    }
+
+    private static func guideFollowUps(topic: String) -> [String] {
+        switch topic {
+        case "rls":
+            return ["Which comfort step is easiest to try safely this week: symptom log, evening stretch, short walk, or schedule regularity?", "Are there medication, anemia/iron, kidney, pregnancy, or neurologic concerns that should be reviewed by a clinician?"]
+        case "osa":
+            return ["Has anyone observed pauses in breathing or choking awakenings?", "Is daytime sleepiness affecting driving, work, or safety?"]
+        case "insomnia":
+            return ["Which part is hardest right now: falling asleep, staying asleep, early waking, or worry before bed?", "Would a consistent wake time and earlier worry-list routine be realistic this week?"]
+        default:
+            return ["What is one sleep habit you can change for seven nights without risk?", "Which symptom or sleep metric should Restleg track most closely next?"]
+        }
+    }
+
     private static func careBoundary(redFlags: [String]) -> String {
         if redFlags.isEmpty {
-            return "Educational only. Seek clinician or sleep-specialist review if symptoms persist, worsen, cause major daytime impairment, involve breathing pauses, pregnancy/childhood symptoms, anemia/kidney/neurologic concerns, or medication/device questions."
+            return "If symptoms persist, worsen, affect daytime function, involve breathing pauses, pregnancy/childhood symptoms, anemia/kidney/neurologic concerns, or medication/device questions, consider clinician or sleep-specialist review."
         }
-        return "Because the local agent detected \(redFlags.joined(separator: ", ")), use this app only to organize notes and seek timely clinician or sleep-specialist review."
+        return "Because Restleg noticed \(redFlags.joined(separator: ", ")), use this app to organize notes and seek timely clinician or sleep-specialist review."
     }
 
     private static func rlsFollowUps(question: String) -> [RLSFollowUpQuestion] {
@@ -842,7 +948,7 @@ private enum LocalSleepAgent {
         baseline: BaselineScreeningResult?
     ) -> HealthEducationPrescription {
         HealthEducationPrescription(
-            title: "Restleg sleep health education prescription",
+            title: "Restleg sleep guidance",
             targetUser: "For the current app user; generated locally on device.",
             healthProblem: topicDisplay(topic),
             briefSummary: sections.interpretation,
@@ -857,8 +963,8 @@ private enum LocalSleepAgent {
                 baseline.map { "Baseline available: \($0.validNightCount) usable nights." } ?? "Build a local baseline from Health sleep data when available.",
                 followUps.prefix(2).map(\.question).joined(separator: " "),
             ].filter { !$0.isEmpty },
-            useInstructions: "Use together with symptom tracking and clinician discussion. This is education only, not a medical prescription.",
-            safetyScope: "Allowed: education, trend review, symptom tracking, and clinician-preparation. Not allowed: diagnosis, medication or supplement dosing, iron treatment, CPAP/device settings, or device purchase decisions."
+            useInstructions: "Use together with symptom tracking and clinician discussion. This is not a medical prescription.",
+            safetyScope: "Restleg supports trend review, symptom tracking, and next questions. It should not diagnose, recommend medication or supplement dosing, set CPAP/device parameters, or make device purchase decisions."
         )
     }
 
@@ -877,10 +983,10 @@ private enum LocalSleepAgent {
 
     private static func topicDisplay(_ topic: String) -> String {
         switch topic {
-        case "rls": return "RLS-style leg discomfort education"
-        case "osa": return "Possible sleep-breathing warning education"
-        case "insomnia": return "Insomnia-style sleep difficulty education"
-        default: return "General sleep health trend education"
+        case "rls": return "RLS-style leg discomfort"
+        case "osa": return "Possible sleep-breathing warning signs"
+        case "insomnia": return "Trouble falling asleep"
+        default: return "General sleep trend"
         }
     }
 

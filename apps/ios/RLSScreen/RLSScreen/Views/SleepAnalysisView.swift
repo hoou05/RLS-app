@@ -9,30 +9,69 @@ struct SleepAnalysisView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if store.history.isEmpty {
-                        ContentUnavailableView(
-                            "No Sleep History",
-                            systemImage: "chart.line.uptrend.xyaxis",
-                            description: Text("Run screenings or import Health sleep data to start building trends.")
-                        )
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 80)
-                    } else {
-                        TrendOverviewPanel(analysis: analysis)
-                        SleepDurationChart(analysis: analysis)
-                        RiskScoreChart(analysis: analysis)
-                        SleepStagesPanel(analysis: analysis)
-                        InsightPanel(insights: analysis.insights)
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if store.history.isEmpty {
+                    ContentUnavailableView(
+                        "No Sleep History",
+                        systemImage: "chart.line.uptrend.xyaxis",
+                        description: Text("Run screenings or import Health sleep data to start building trends.")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 80)
+                } else {
+                    TrendSummaryPanel(analysis: analysis)
+                    TrendOverviewPanel(analysis: analysis)
+                    SleepDurationChart(analysis: analysis)
+                    RiskScoreChart(analysis: analysis)
+                    SleepStagesPanel(analysis: analysis)
+                    InsightPanel(insights: analysis.insights)
                 }
-                .padding(16)
             }
-            .restlegBackground()
-            .navigationTitle("Trends")
+            .padding(16)
         }
+    }
+}
+
+private struct TrendSummaryPanel: View {
+    let analysis: SleepTrendAnalysis
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Trend Analysis", systemImage: "sparkles")
+                .font(.headline)
+                .foregroundStyle(RestlegTheme.ink)
+
+            Text(summary)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Use this as a pattern check, not a diagnosis. If sleep disruption persists or daytime function is affected, bring these notes to a clinician.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .panelStyle()
+    }
+
+    private var summary: String {
+        var parts: [String] = []
+        if let avg = analysis.averageSleepDurationMinutes {
+            parts.append("Recent records average \(SleepTrendAnalysis.formatDuration(minutes: avg)) of sleep.")
+        }
+        if let efficiency = analysis.averageSleepEfficiency {
+            parts.append("Average efficiency is \(efficiency.formatted(.number.precision(.fractionLength(0))))%.")
+        }
+        if let change = analysis.sleepDurationChangeMinutes {
+            parts.append("Sleep duration is \(SleepTrendAnalysis.formatSignedMinutes(change)) versus prior records.")
+        }
+        if analysis.shortSleepNightCount > 0 {
+            parts.append("\(analysis.shortSleepNightCount) recent night(s) were short-sleep nights.")
+        }
+        if analysis.lowEfficiencyNightCount > 0 {
+            parts.append("\(analysis.lowEfficiencyNightCount) recent night(s) had lower sleep efficiency.")
+        }
+        return parts.isEmpty ? "Trend data is present, but key sleep metrics are still limited. Continue collecting a few more nights for a clearer pattern." : parts.joined(separator: " ")
     }
 }
 
@@ -227,7 +266,7 @@ private struct InsightPanel: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            Text("Trend analysis is for tracking and education only. It does not diagnose sleep disorders or RLS.")
+            Text("Trend analysis is for tracking patterns only. It does not diagnose sleep disorders or RLS.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

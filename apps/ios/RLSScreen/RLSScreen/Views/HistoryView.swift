@@ -4,30 +4,38 @@ struct HistoryView: View {
     @EnvironmentObject private var store: ScreeningStore
 
     var body: some View {
-        NavigationStack {
-            List {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
                 if store.history.isEmpty {
                     ContentUnavailableView(
                         "No History",
                         systemImage: "clock",
                         description: Text("Completed screenings will appear here.")
                     )
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 80)
                 } else {
+                    HStack {
+                        Label("Prediction History", systemImage: "clock.arrow.circlepath")
+                            .font(.headline)
+                            .foregroundStyle(RestlegTheme.ink)
+                        Spacer()
+                        Button(role: .destructive) {
+                            store.clearHistory()
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .panelStyle()
+
                     ForEach(store.history) { record in
                         HistoryRow(record: record)
                     }
                 }
             }
-            .navigationTitle("History")
-            .toolbar {
-                if !store.history.isEmpty {
-                    Button(role: .destructive) {
-                        store.clearHistory()
-                    } label: {
-                        Label("Clear", systemImage: "trash")
-                    }
-                }
-            }
+            .padding(16)
         }
     }
 }
@@ -40,9 +48,11 @@ private struct HistoryRow: View {
             HStack {
                 Text(record.riskLevel.capitalized)
                     .font(.headline)
+                    .foregroundStyle(RestlegTheme.ink)
                 Spacer()
                 Text(record.riskScore, format: .percent.precision(.fractionLength(1)))
                     .font(.headline.monospacedDigit())
+                    .foregroundStyle(RestlegTheme.blue)
             }
 
             HStack {
@@ -55,7 +65,6 @@ private struct HistoryRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 4)
+        .panelStyle()
     }
 }
-

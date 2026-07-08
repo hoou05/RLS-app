@@ -88,9 +88,9 @@ struct ScreeningRecord: Codable, Identifiable, Equatable {
     let totalFeatureCount: Int?
     let input: ScreeningForm
 
-    init(prediction: RLSPrediction, input: ScreeningForm) {
+    init(prediction: RLSPrediction, input: ScreeningForm, createdAt: Date = Date()) {
         self.id = UUID()
-        self.createdAt = Date()
+        self.createdAt = createdAt
         self.tier = prediction.tier.rawValue
         self.riskScore = prediction.riskScore
         self.riskLevel = RiskLevel(score: prediction.riskScore).rawValue

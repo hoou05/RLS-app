@@ -81,10 +81,7 @@ final class ScreeningStore: ObservableObject {
         errorMessage = nil
         healthImportMessage = nil
 
-        guard form.isQuestionnaireComplete else {
-            errorMessage = "Complete the questionnaire before building a baseline."
-            return
-        }
+        applyDirectImportQuestionnaireDefaultsIfNeeded()
 
         guard let engine else {
             errorMessage = ScreeningStoreError.modelBundleUnavailable.localizedDescription
@@ -116,11 +113,25 @@ final class ScreeningStore: ObservableObject {
                 predictions: predictions
             )
             baselineResult = baseline
+            let healthRecords = predictions.map { prediction, form in
+                ScreeningRecord(
+                    prediction: prediction,
+                    input: form,
+                    createdAt: form.sleepSessionEndDate ?? Date()
+                )
+            }
+            .sorted { lhs, rhs in
+                (lhs.input.sleepSessionEndDate ?? lhs.createdAt) > (rhs.input.sleepSessionEndDate ?? rhs.createdAt)
+            }
+            history = Array(healthRecords.prefix(30))
+            latestTier1 = history.first
+            latestTier2 = history.first
 
             if let latestForm = result.forms.first {
                 form = latestForm
             }
 
+            saveHistory()
             saveBaseline()
 
             let imported = result.importedFieldNames.joined(separator: ", ")
@@ -271,6 +282,21 @@ final class ScreeningStore: ObservableObject {
             return nil
         }
         return try? RLSInferenceEngine(modelBundleURL: url)
+    }
+
+    private func applyDirectImportQuestionnaireDefaultsIfNeeded() {
+        if form.familyHistoryRLS == nil {
+            form.familyHistoryRLS = false
+        }
+        if form.diabetes == nil {
+            form.diabetes = false
+        }
+        if form.psychiatricMedication == nil {
+            form.psychiatricMedication = false
+        }
+        if form.nonLegSymptoms == nil {
+            form.nonLegSymptoms = false
+        }
     }
 }
 

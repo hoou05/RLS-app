@@ -7,20 +7,51 @@ struct OnboardingView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Image("RestlegLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: 190, alignment: .leading)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        Text("Build Your Baseline")
-                            .font(.system(size: 34, weight: .bold))
-                            .foregroundStyle(RestlegTheme.ink)
-                        Text("Complete the questionnaire, then import Health sleep data. Restleg will run the model on up to 60 recent sleep sessions and summarize the typical screening pattern.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    HStack(alignment: .center, spacing: 18) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Restleg")
+                                .font(.system(size: 34, weight: .bold, design: .rounded))
+                                .foregroundStyle(RestlegTheme.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.82)
+                            Text(currentRiskScore == nil ? "Build your first local baseline." : "Latest local risk score.")
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        RiskScoreDial(
+                            score: currentRiskScore,
+                            title: riskTitle,
+                            subtitle: riskSubtitle
+                        )
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 4)
+                    .background {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [RestlegTheme.panelTint, .white.opacity(0.96)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            VStack(spacing: 12) {
+                                Capsule()
+                                    .fill(RestlegTheme.sky.opacity(0.46))
+                                    .frame(width: 180, height: 8)
+                                Capsule()
+                                    .fill(RestlegTheme.teal.opacity(0.18))
+                                    .frame(width: 130, height: 8)
+                            }
+                            .rotationEffect(.degrees(-18))
+                            .offset(x: 74, y: 42)
+                        }
+                    }
 
                     VStack(alignment: .leading, spacing: 14) {
                         Label("Questionnaire", systemImage: "checklist")
@@ -72,15 +103,9 @@ struct OnboardingView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(RestlegTheme.green)
                         .controlSize(.large)
-                        .disabled(!store.form.isQuestionnaireComplete || store.isBuildingBaseline)
+                        .disabled(store.isBuildingBaseline)
                     }
                     .panelStyle()
-
-                    if !store.form.isQuestionnaireComplete {
-                        Label("Answer all questionnaire items to continue.", systemImage: "info.circle")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
 
                     if let message = store.healthImportMessage {
                         Text(message)
@@ -101,8 +126,75 @@ struct OnboardingView: View {
                 .padding(16)
             }
             .restlegBackground()
-            .navigationTitle("Restleg")
+            .toolbar(.hidden, for: .navigationBar)
         }
+    }
+
+    private var currentRiskScore: Double? {
+        store.latestTier2?.riskScore ?? store.baselineResult?.typicalScore
+    }
+
+    private var riskTitle: String {
+        guard let score = currentRiskScore else {
+            return "Risk"
+        }
+        return RiskLevel(score: score).title
+    }
+
+    private var riskSubtitle: String {
+        currentRiskScore == nil ? "Baseline needed" : "Latest score"
+    }
+}
+
+private struct RiskScoreDial: View {
+    let score: Double?
+    let title: String
+    let subtitle: String
+
+    private var progress: Double {
+        min(max(score ?? 0, 0), 1)
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [RestlegTheme.sky, RestlegTheme.blue, RestlegTheme.navy],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: RestlegTheme.navy.opacity(0.22), radius: 18, x: 0, y: 10)
+
+            Circle()
+                .stroke(RestlegTheme.sky.opacity(0.55), lineWidth: 10)
+                .padding(5)
+
+            Circle()
+                .stroke(Color.white.opacity(0.28), lineWidth: 7)
+                .padding(18)
+
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(Color.white, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .padding(18)
+
+            VStack(spacing: 2) {
+                Text(score.map { $0.formatted(.number.precision(.fractionLength(2))) } ?? "--")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                Text(title)
+                    .font(.caption.weight(.bold))
+                Text(subtitle)
+                    .font(.caption2)
+                    .opacity(0.8)
+            }
+            .foregroundStyle(.white)
+        }
+        .frame(width: 142, height: 142)
+        .accessibilityLabel("Risk score")
     }
 }
 
