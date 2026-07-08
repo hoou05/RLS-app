@@ -36,6 +36,7 @@ function App() {
   const [agentQuestion, setAgentQuestion] = useState("Could my night leg discomfort be Restleg / RLS?");
   const [agentReply, setAgentReply] = useState<any | null>(null);
   const [agentUseExternal, setAgentUseExternal] = useState(false);
+  const [agentDebugOpen, setAgentDebugOpen] = useState(false);
   const [widgetOpen, setWidgetOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<AgentChatMessage[]>([
     {
@@ -227,6 +228,28 @@ function App() {
     });
   }
 
+  async function sendAgentFeedback(rating: string) {
+    if (!agentReply) return;
+    await runAction("agent-feedback", async () => {
+      const result = await api("/agent/feedback", {
+        method: "POST",
+        body: JSON.stringify({
+          rating,
+          question: agentQuestion,
+          answer_excerpt: agentReply.answer?.slice(0, 1000),
+          metadata: {
+            provider: agentReply.provider,
+            topic: agentReply.plan?.topic,
+            hitl_required: agentReply.hitl_required,
+          },
+        }),
+      });
+      setAgentReply((reply: any) => reply ? { ...reply, user_memory: result.memory } : reply);
+      setMessageKind("success");
+      setMessage("Feedback saved for future personalization.");
+    });
+  }
+
   async function runAction(name: string, action: () => Promise<void>) {
     setBusyAction(name);
     setMessageKind("info");
@@ -334,13 +357,17 @@ function App() {
               <div className="agent-heading">
                 <Bot size={24} />
                 <div>
-                  <h2>Sleep agent debug</h2>
+                  <h2>Sleep agent</h2>
                   <p>Trend review, conservative guidance, and bounded sleep-health Q&A on top of your current structured data.</p>
                 </div>
               </div>
               <label className="agent-toggle">
                 <input type="checkbox" checked={agentUseExternal} onChange={(event) => setAgentUseExternal(event.target.checked)} />
                 <span>Use DeepSeek explanation layer only from structured summaries</span>
+              </label>
+              <label className="agent-toggle">
+                <input type="checkbox" checked={agentDebugOpen} onChange={(event) => setAgentDebugOpen(event.target.checked)} />
+                <span>Developer details</span>
               </label>
               <p className="agent-boundary-note">
                 When enabled, the backend still sends only trend summaries, selected templates, screening summaries, and safety flags.
@@ -366,7 +393,7 @@ function App() {
               <h2>Agent response</h2>
               {agentReply ? (
                 <>
-                  <p className="agent-answer">{agentReply.answer}</p>
+                  <AgentUserResponse reply={agentReply} onFeedback={sendAgentFeedback} busy={busyAction !== null} />
                   <div className="agent-meta">
                     <span>Provider: {agentReply.provider}</span>
                     <span>Planner: {agentReply.planner_provider}</span>
@@ -377,18 +404,22 @@ function App() {
                   {agentReply.external_model_error && (
                     <p className="agent-error-note">{agentReply.external_model_error}</p>
                   )}
-                  <PlanPanel reply={agentReply} />
-                  <TrendSnapshot reply={agentReply} />
-                  <TemplateList reply={agentReply} />
-                  <ScreeningPanel reply={agentReply} />
-                  <FlagPanel title="Red flags" items={agentReply.red_flags} emptyLabel="No immediate red-flag signals surfaced from the current question and notes." />
-                  <KnowledgePanel reply={agentReply} />
-                  <ToolTracePanel reply={agentReply} />
-                  <FlagPanel title="Guide points" items={agentReply.guide_points} emptyLabel="No guide points selected yet." />
-                  <h3>Safety limits</h3>
-                  <ul>{agentReply.safety_limits?.map((point: string) => <li key={point}>{point}</li>)}</ul>
-                  <h3>Knowledge sources</h3>
-                  <ul>{agentReply.knowledge_sources?.map((point: string) => <li key={point}>{point}</li>)}</ul>
+                  {agentDebugOpen && (
+                    <div className="agent-debug-section">
+                      <PlanPanel reply={agentReply} />
+                      <TrendSnapshot reply={agentReply} />
+                      <TemplateList reply={agentReply} />
+                      <ScreeningPanel reply={agentReply} />
+                      <FlagPanel title="Red flags" items={agentReply.red_flags} emptyLabel="No immediate red-flag signals surfaced from the current question and notes." />
+                      <KnowledgePanel reply={agentReply} />
+                      <ToolTracePanel reply={agentReply} />
+                      <FlagPanel title="Guide points" items={agentReply.guide_points} emptyLabel="No guide points selected yet." />
+                      <h3>Safety limits</h3>
+                      <ul>{agentReply.safety_limits?.map((point: string) => <li key={point}>{point}</li>)}</ul>
+                      <h3>Knowledge sources</h3>
+                      <ul>{agentReply.knowledge_sources?.map((point: string) => <li key={point}>{point}</li>)}</ul>
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="agent-empty">Run a trend, guide, or question check to see the agent output here.</p>
@@ -625,6 +656,99 @@ function JsonList({ title, items }: { title: string; items: any[] }) {
   return <section className="panel wide"><h2>{title}</h2><pre>{JSON.stringify(items, null, 2)}</pre></section>;
 }
 
+function AgentUserResponse({ reply, onFeedback, busy }: { reply: any; onFeedback: (rating: string) => void; busy: boolean }) {
+  const sections = reply?.answer_sections;
+  const baseline = reply?.personal_baseline;
+  if (!sections) return <p className="agent-answer">{reply.answer}</p>;
+  return (
+    <div className="agent-user-response">
+      <div className="agent-answer-block primary">
+        <small>Trend observation</small>
+        <p>{sections.trend_observation}</p>
+      </div>
+      <div className="agent-answer-block">
+        <small>What it may mean</small>
+        <p>{sections.interpretation}</p>
+      </div>
+      <div className="agent-answer-grid">
+        <div className="agent-answer-block">
+          <small>Low-risk next steps</small>
+          <ul>{sections.low_risk_suggestions?.map((item: string) => <li key={item}>{item}</li>)}</ul>
+        </div>
+        <div className="agent-answer-block">
+          <small>Follow-up questions</small>
+          <ul>{sections.follow_up_questions?.map((item: string) => <li key={item}>{item}</li>)}</ul>
+        </div>
+      </div>
+      {reply.rls_follow_up_questions?.length > 0 && (
+        <div className="agent-answer-block">
+          <small>RLS five-feature follow-up</small>
+          <div className="rls-followup-list">
+            {reply.rls_follow_up_questions.map((item: any) => (
+              <div className={item.answered ? "answered" : ""} key={item.criterion}>
+                <strong>{item.criterion.replaceAll("_", " ")}</strong>
+                <p>{item.question}</p>
+                <em>{item.why_it_matters}</em>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="agent-answer-block boundary">
+        <small>Care boundary</small>
+        <p>{sections.care_boundary}</p>
+      </div>
+      {reply.education_prescription && <EducationPrescriptionCard prescription={reply.education_prescription} />}
+      {baseline && (
+        <div className="agent-baseline-strip">
+          <span>Baseline confidence: {baseline.confidence}</span>
+          <span>Data days: {baseline.data_days}</span>
+          <span>Usual sleep: {baseline.usual_sleep_minutes ? `${baseline.usual_sleep_minutes} min` : "--"}</span>
+          <span>RLS night rate: {baseline.rls_symptom_rate ?? "--"}</span>
+        </div>
+      )}
+      <div className="agent-feedback-row">
+        <span>Was this useful?</span>
+        {[
+          ["helpful", "Helpful"],
+          ["too_generic", "Too generic"],
+          ["too_complex", "Too complex"],
+          ["already_tried", "Already tried"],
+        ].map(([rating, label]) => (
+          <button disabled={busy} onClick={() => onFeedback(rating)} key={rating}>{label}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EducationPrescriptionCard({ prescription }: { prescription: any }) {
+  return (
+    <div className="agent-prescription-card">
+      <div>
+        <small>Health education prescription</small>
+        <h3>{prescription.title}</h3>
+        <p>{prescription.target_user}</p>
+      </div>
+      <div className="agent-prescription-grid">
+        <div>
+          <strong>Health problem</strong>
+          <p>{prescription.health_problem}</p>
+        </div>
+        <div>
+          <strong>Use instructions</strong>
+          <p>{prescription.use_instructions}</p>
+        </div>
+      </div>
+      <FlagPanel title="Symptoms to track" items={prescription.key_symptoms_to_track} emptyLabel="No symptom tracking items returned." />
+      <FlagPanel title="Risk factors to review" items={prescription.risk_factors_to_review} emptyLabel="No risk-factor review items returned." />
+      <FlagPanel title="Guidance items" items={prescription.guidance_items} emptyLabel="No guidance items returned." />
+      <FlagPanel title="Other guidance" items={prescription.other_guidance} emptyLabel="No additional guidance returned." />
+      <p className="agent-prescription-safety">{prescription.safety_scope}</p>
+    </div>
+  );
+}
+
 function PlanPanel({ reply }: { reply: any }) {
   const plan = reply?.plan;
   if (!plan) return null;
@@ -790,6 +914,7 @@ function labelForAction(action: string) {
     "agent-trend": "Asking sleep agent for trend analysis",
     "agent-guide": "Asking sleep agent for guide points",
     "agent-question": "Asking sleep agent",
+    "agent-feedback": "Saving feedback",
   };
   return labels[action] ?? "Working";
 }

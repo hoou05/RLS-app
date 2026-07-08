@@ -8,9 +8,15 @@ struct OnboardingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 10) {
+                        Image("RestlegLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 190, alignment: .leading)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         Text("Build Your Baseline")
                             .font(.system(size: 34, weight: .bold))
-                        Text("Complete the questionnaire, then import Health sleep data. RLS Screen will run the model on up to 60 recent sleep sessions and summarize the typical screening pattern.")
+                            .foregroundStyle(RestlegTheme.ink)
+                        Text("Complete the questionnaire, then import Health sleep data. Restleg will run the model on up to 60 recent sleep sessions and summarize the typical screening pattern.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -64,6 +70,7 @@ struct OnboardingView: View {
                             }
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(RestlegTheme.green)
                         .controlSize(.large)
                         .disabled(!store.form.isQuestionnaireComplete || store.isBuildingBaseline)
                     }
@@ -93,8 +100,8 @@ struct OnboardingView: View {
                 }
                 .padding(16)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("RLS Screen")
+            .restlegBackground()
+            .navigationTitle("Restleg")
         }
     }
 }

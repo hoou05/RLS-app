@@ -44,12 +44,13 @@ struct ScreeningView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(RestlegTheme.green)
                     .controlSize(.large)
                 }
                 .padding(16)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("RLS Screen")
+            .restlegBackground()
+            .navigationTitle("Restleg")
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -115,7 +116,7 @@ private struct BaselineSummaryPanel: View {
     private func color(for level: RiskLevel) -> Color {
         switch level {
         case .low:
-            return .green
+            return RestlegTheme.green
         case .moderate:
             return .orange
         case .high:
@@ -208,7 +209,7 @@ private struct ResultSummaryView: View {
     private func color(for level: RiskLevel) -> Color {
         switch level {
         case .low:
-            return .green
+            return RestlegTheme.green
         case .moderate:
             return .orange
         case .high:
@@ -247,7 +248,7 @@ private struct MetricPill: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+        .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

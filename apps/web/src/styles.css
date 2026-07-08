@@ -658,6 +658,186 @@ h2 { margin: 0 0 14px; font-size: 18px; }
   margin: 0 0 14px;
 }
 
+.agent-user-response {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.agent-answer-block {
+  color: #253f34;
+  background: #fbfefc;
+  border: 1px solid #d5eadf;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.agent-answer-block.primary {
+  background: linear-gradient(180deg, #f4fbf7, #eaf8f0);
+  border-color: #bfe2ce;
+}
+
+.agent-answer-block.boundary {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #6f3218;
+}
+
+.agent-answer-block small {
+  display: block;
+  color: #147d44;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+}
+
+.agent-answer-block p {
+  line-height: 1.58;
+  margin: 0;
+}
+
+.agent-answer-block ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.5;
+}
+
+.agent-answer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rls-followup-list {
+  display: grid;
+  gap: 8px;
+}
+
+.rls-followup-list div {
+  border: 1px solid #e0eee5;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.rls-followup-list div.answered {
+  background: #eef8f2;
+  border-color: #bfe2ce;
+}
+
+.rls-followup-list strong {
+  display: block;
+  color: #1d3d30;
+  text-transform: capitalize;
+}
+
+.rls-followup-list em {
+  color: #6a8075;
+  display: block;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.45;
+  margin-top: 5px;
+}
+
+.agent-baseline-strip, .agent-feedback-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.agent-baseline-strip span {
+  color: #145a49;
+  background: #e5f4ee;
+  border: 1px solid #b8dfce;
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agent-feedback-row {
+  color: #536b60;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.agent-feedback-row button {
+  border: 1px solid #bddacb;
+  border-radius: 8px;
+  color: #174b34;
+  background: #ffffff;
+  cursor: pointer;
+  padding: 7px 10px;
+}
+
+.agent-prescription-card {
+  background: #ffffff;
+  border: 1px solid #bfe2ce;
+  border-radius: 8px;
+  box-shadow: inset 4px 0 0 #168342;
+  padding: 14px;
+}
+
+.agent-prescription-card small {
+  color: #147d44;
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-prescription-card h3 {
+  color: #15372a;
+  margin: 6px 0;
+}
+
+.agent-prescription-card p {
+  color: #536b60;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.agent-prescription-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.agent-prescription-grid div {
+  background: #f5fbf7;
+  border: 1px solid #d8ebdf;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.agent-prescription-grid strong {
+  color: #1d3d30;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.agent-prescription-safety {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #7a3415 !important;
+  font-weight: 700;
+  margin-top: 12px !important;
+  padding: 10px 12px;
+}
+
+.agent-debug-section {
+  border-top: 1px solid #d7e8dd;
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
 .agent-meta {
   display: flex;
   flex-wrap: wrap;

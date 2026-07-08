@@ -16,8 +16,10 @@ AVAILABLE_TOOLS = [
     "analyze_sleep_trends",
     "screen_rls",
     "detect_red_flags",
+    "ask_rls_followup_questions",
     "select_templates",
     "retrieve_knowledge",
+    "personalize_with_memory",
     "enforce_guardrails",
 ]
 
@@ -49,7 +51,7 @@ def _rule_plan(mode: str, question: str, topic: str, trend_summary, rls_result, 
         return AgentPlan(
             intent="referral_escalation",
             rationale="The user is asking for diagnosis, medication, dosing, iron, device, or CPAP-setting guidance, so safety boundaries and referral language must come first.",
-            tool_sequence=["detect_red_flags", "retrieve_knowledge", "select_templates", "enforce_guardrails"],
+            tool_sequence=["detect_red_flags", "retrieve_knowledge", "select_templates", "personalize_with_memory", "enforce_guardrails"],
             hitl_required=True,
             topic=topic,
         )
@@ -57,7 +59,7 @@ def _rule_plan(mode: str, question: str, topic: str, trend_summary, rls_result, 
         return AgentPlan(
             intent="trend_analysis",
             rationale="The request is explicitly for trend review, so the response should prioritize deterministic sleep-summary tools and educational follow-up.",
-            tool_sequence=["analyze_sleep_trends", "detect_red_flags", "select_templates", "retrieve_knowledge", "enforce_guardrails"],
+            tool_sequence=["analyze_sleep_trends", "detect_red_flags", "select_templates", "retrieve_knowledge", "personalize_with_memory", "enforce_guardrails"],
             hitl_required=bool(red_flags),
             topic=topic,
         )
@@ -65,7 +67,7 @@ def _rule_plan(mode: str, question: str, topic: str, trend_summary, rls_result, 
         return AgentPlan(
             intent="referral_escalation",
             rationale="Red-flag symptoms or contexts are present, so referral-oriented education should take priority over exploratory guidance alone.",
-            tool_sequence=["detect_red_flags", "retrieve_knowledge", "select_templates", "enforce_guardrails"],
+            tool_sequence=["detect_red_flags", "retrieve_knowledge", "select_templates", "personalize_with_memory", "enforce_guardrails"],
             hitl_required=True,
             topic=topic,
         )
@@ -73,7 +75,7 @@ def _rule_plan(mode: str, question: str, topic: str, trend_summary, rls_result, 
         return AgentPlan(
             intent="symptom_qa",
             rationale="The question maps to RLS-like symptoms, so educational screening plus template and knowledge retrieval are appropriate.",
-            tool_sequence=["screen_rls", "retrieve_knowledge", "select_templates", "enforce_guardrails"],
+            tool_sequence=["screen_rls", "ask_rls_followup_questions", "retrieve_knowledge", "select_templates", "personalize_with_memory", "enforce_guardrails"],
             hitl_required=bool(rls_result and rls_result.should_seek_care),
             topic="rls",
         )
@@ -81,14 +83,14 @@ def _rule_plan(mode: str, question: str, topic: str, trend_summary, rls_result, 
         return AgentPlan(
             intent="education_guidance",
             rationale="The request is for general sleep guidance, so the system should prefer template-driven education and supportive knowledge snippets.",
-            tool_sequence=["analyze_sleep_trends", "select_templates", "retrieve_knowledge", "enforce_guardrails"],
+            tool_sequence=["analyze_sleep_trends", "select_templates", "retrieve_knowledge", "personalize_with_memory", "enforce_guardrails"],
             hitl_required=False,
             topic=topic,
         )
     return AgentPlan(
         intent="symptom_qa",
         rationale="The question is best handled by routing to education templates and topic-specific knowledge before generating an answer.",
-        tool_sequence=["detect_red_flags", "retrieve_knowledge", "select_templates", "enforce_guardrails"],
+        tool_sequence=["detect_red_flags", "retrieve_knowledge", "select_templates", "personalize_with_memory", "enforce_guardrails"],
         hitl_required=bool(red_flags),
         topic=topic,
     )

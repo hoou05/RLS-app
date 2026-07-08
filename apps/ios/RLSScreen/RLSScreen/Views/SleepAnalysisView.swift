@@ -30,7 +30,7 @@ struct SleepAnalysisView: View {
                 }
                 .padding(16)
             }
-            .background(Color(.systemGroupedBackground))
+            .restlegBackground()
             .navigationTitle("Trends")
         }
     }
@@ -103,13 +103,13 @@ private struct SleepDurationChart: View {
                         x: .value("Date", point.date, unit: .day),
                         y: .value("Hours", point.value)
                     )
-                    .foregroundStyle(.green)
+                    .foregroundStyle(RestlegTheme.teal)
 
                     PointMark(
                         x: .value("Date", point.date, unit: .day),
                         y: .value("Hours", point.value)
                     )
-                    .foregroundStyle(.green)
+                    .foregroundStyle(RestlegTheme.teal)
 
                     RuleMark(y: .value("Reference", 6.5))
                         .foregroundStyle(.orange.opacity(0.45))
@@ -237,7 +237,7 @@ private struct InsightPanel: View {
     private func color(for severity: SleepTrendInsight.Severity) -> Color {
         switch severity {
         case .stable:
-            return .green
+            return RestlegTheme.green
         case .watch:
             return .orange
         case .attention:
@@ -268,7 +268,7 @@ private struct TrendMetricTile: View {
         }
         .frame(maxWidth: .infinity, minHeight: 94, alignment: .leading)
         .padding(12)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+        .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -297,7 +297,7 @@ private struct MissingMetricView: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+            .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

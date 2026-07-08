@@ -13,12 +13,14 @@ from sqlmodel import Session, select
 from app.agent.safety import detect_red_flags, enforce_guardrails, forbidden_request_response, is_forbidden_request, load_safety_rules
 from app.core.config import Settings
 from app.db.models import DailyFeature, QuestionnaireResponse, User
-from app.schemas.agent import EducationPrescription, SleepAgentRequest, SleepAgentResponse, ToolExecution
+from app.schemas.agent import EducationPrescription, HealthEducationPrescription, PersonalBaseline, SleepAgentAnswerSections, SleepAgentRequest, SleepAgentResponse, ToolExecution
 from app.services.agent_planner import PLANNER_BOUNDARY, build_agent_plan
 from app.services.education_library import select_templates
 from app.services.knowledge_base import retrieve_knowledge
+from app.services.rls_followup import build_rls_follow_up_questions
 from app.services.rls_screening import screen_rls
 from app.services.sleep_trend_analyzer import analyze_sleep_trends
+from app.services.user_memory import build_personal_baseline, memory_to_read, refresh_memory_baseline
 
 SAFETY_LIMITS = [
     "The agent can support sleep trend analysis, education, symptom tracking, and guidance on when to seek clinical care.",
@@ -38,6 +40,7 @@ KNOWLEDGE_SOURCES = [
     "knowledge_base/general_sleep/aasm_sleep_hygiene.md",
     "knowledge_base/insomnia/aasm_2021_behavioral_insomnia.md",
     "knowledge_base/osa/aasm_2017_osa_diagnostic_testing.md",
+    "knowledge_base/safety/health_education_prescription_format.md",
 ]
 
 STRUCTURED_ONLY_NOTICE = (
@@ -77,9 +80,34 @@ def build_sleep_agent_response(
     )
     templates = select_templates(payload.mode, trend_summary, red_flags, plan.topic)
     knowledge_snippets = retrieve_knowledge(plan.topic, red_flags)
-    tool_trace = _execute_tool_trace(plan, trend_summary, rls_result, red_flags, templates, knowledge_snippets)
-    local_answer = _compose_local_answer(payload, trend_summary, templates, plan.topic, rls_result, red_flags, knowledge_snippets, plan.hitl_required)
-    local_answer = enforce_guardrails(local_answer)
+    rls_followups = build_rls_follow_up_questions(payload.question or "", rls_result.matched_features if rls_result else [])
+    personal_baseline = build_personal_baseline(context.features)
+    memory = refresh_memory_baseline(session, user.id, context.features) if user.id is not None else None
+    user_memory = memory_to_read(memory)
+    tool_trace = _execute_tool_trace(plan, trend_summary, rls_result, red_flags, templates, knowledge_snippets, rls_followups, personal_baseline)
+    answer_sections = _compose_answer_sections(
+        payload,
+        trend_summary,
+        templates,
+        plan.topic,
+        rls_result,
+        red_flags,
+        knowledge_snippets,
+        plan.hitl_required,
+        rls_followups,
+        personal_baseline,
+        user_memory.avoid_repeating,
+    )
+    education_prescription = _build_health_education_prescription(
+        topic,
+        trend_summary,
+        answer_sections,
+        rls_result,
+        red_flags,
+        rls_followups,
+        personal_baseline,
+    )
+    local_answer = enforce_guardrails(_sections_to_answer(answer_sections))
     data_used = _data_used(context)
 
     external_answer = None
@@ -112,6 +140,11 @@ def build_sleep_agent_response(
         planner_provider=planner_provider,
         hitl_required=plan.hitl_required,
         answer=external_answer or local_answer,
+        answer_sections=answer_sections,
+        education_prescription=education_prescription,
+        rls_follow_up_questions=rls_followups if plan.topic == "rls" else [],
+        personal_baseline=personal_baseline,
+        user_memory=user_memory,
         plan=plan,
         tool_trace=tool_trace,
         trend_summary=trend_summary,
@@ -162,7 +195,7 @@ def _route_topic(question: str, trend_summary, rls_result) -> str:
     return "general"
 
 
-def _compose_local_answer(
+def _compose_answer_sections(
     payload: SleepAgentRequest,
     trend_summary,
     templates: list[EducationPrescription],
@@ -171,55 +204,25 @@ def _compose_local_answer(
     red_flags: list[str],
     knowledge_snippets,
     hitl_required: bool,
-) -> str:
+    rls_followups,
+    personal_baseline: PersonalBaseline,
+    avoid_repeating: list[str],
+) -> SleepAgentAnswerSections:
     if is_forbidden_request(red_flags):
-        parts = [forbidden_request_response()]
-        if red_flags:
-            parts.append("Because this question crosses a medical safety boundary, clinician review is the right next step for individualized decisions.")
-        parts.extend(item.text for item in templates[:1])
-        return " ".join(parts)
-
-    if payload.mode == "trend":
-        parts = []
-        if trend_summary.avg_sleep_7d is None:
-            parts.append("There is not enough recent sleep data to compare the last 7 days with the prior week yet.")
-        else:
-            parts.append(
-                f"Over the last 7 days, average sleep duration was {trend_summary.avg_sleep_7d:.1f} minutes"
-                + (
-                    f", versus {trend_summary.avg_sleep_prev_7d:.1f} minutes in the prior 7-day window."
-                    if trend_summary.avg_sleep_prev_7d is not None
-                    else "."
-                )
-            )
-            if trend_summary.sleep_duration_change is not None:
-                direction = "decreased" if trend_summary.sleep_duration_change < 0 else "increased"
-                parts.append(f"That means sleep duration {direction} by {abs(trend_summary.sleep_duration_change):.1f} minutes.")
-            if trend_summary.avg_sleep_efficiency_7d is not None:
-                parts.append(f"Average sleep efficiency was {trend_summary.avg_sleep_efficiency_7d:.2f}.")
-            if trend_summary.irregular_schedule_flag:
-                parts.append("Bedtime or wake-time variability suggests an irregular schedule.")
-            if trend_summary.possible_rls_pattern_flag:
-                parts.append(f"RLS-style symptoms were recorded on {trend_summary.rls_symptom_nights} nights in the recent week.")
-            if trend_summary.possible_osa_warning_flag:
-                parts.append("Recent notes or sleepiness scores include features that can justify sleep apnea follow-up.")
-        parts.extend(item.text for item in templates[:2])
-        if knowledge_snippets:
-            parts.append(f"Background reference: {knowledge_snippets[0].snippet}")
-        if red_flags:
-            parts.append("Because some red-flag signals are present, clinical review is worth prioritizing.")
-        if hitl_required:
-            parts.append("A human clinical review threshold was reached because the current pattern includes higher-risk features.")
-        return " ".join(parts)
-
-    if payload.mode == "guide":
-        return " ".join(item.text for item in templates) or (
-            "Focus on regular wake time, a steady sleep schedule, evening caffeine/alcohol reduction, daytime exercise, and a cool, quiet, dark sleep environment."
+        return SleepAgentAnswerSections(
+            trend_observation=_trend_observation(trend_summary, personal_baseline),
+            interpretation="This question asks for individualized diagnosis or treatment decisions, so the safe interpretation is that a clinician should review the situation.",
+            low_risk_suggestions=[
+                "Track symptom timing, triggers, sleep disruption, and any medication or device-related concerns to discuss with a clinician.",
+                "Avoid changing medication, iron treatment, device settings, or treatment devices based only on this app.",
+            ],
+            follow_up_questions=_question_texts(rls_followups) if topic == "rls" else ["What symptoms are most disruptive, and how often are they affecting sleep or daytime function?"],
+            care_boundary=forbidden_request_response(),
         )
 
-    intro = {
+    interpretation_by_topic = {
         "rls": (
-            "Your description includes features that can be seen with Restless Legs Syndrome, especially if discomfort appears at rest, gets worse in the evening, and improves after movement. "
+            "Your description includes features that can be seen with Restless Legs Syndrome, especially if discomfort appears at rest, worsens in the evening, and improves after movement. "
             "That still does not confirm a diagnosis, because cramps, neuropathy, joint issues, venous problems, medication effects, or sleep loss can overlap."
         ),
         "insomnia": (
@@ -232,17 +235,176 @@ def _compose_local_answer(
             "This agent can help with sleep trend review, symptom tracking, and general education across common sleep concerns, with strongest coverage for RLS, insomnia, and possible sleep apnea warning patterns."
         ),
     }[topic]
-    body_parts = [intro]
+    interpretation = interpretation_by_topic
     if rls_result and topic == "rls":
-        body_parts.append(rls_result.explanation)
-    body_parts.extend(item.text for item in templates[:3])
-    if knowledge_snippets:
-        body_parts.append(f"Relevant guidance background: {knowledge_snippets[0].snippet}")
-    if red_flags:
-        body_parts.append("Because your question or notes include higher-risk features, it would be safer to involve a clinician or sleep specialist soon.")
-    if hitl_required:
-        body_parts.append("This case crosses the app's human-review boundary, so referral-oriented guidance takes priority over self-management advice.")
-    return " ".join(body_parts)
+        interpretation = f"{interpretation} {rls_result.explanation}"
+    suggestions = _low_risk_suggestions(topic, templates, avoid_repeating)
+    followups = _follow_up_questions(topic, payload.question or "", rls_followups)
+    boundary = _care_boundary(red_flags, hitl_required)
+    return SleepAgentAnswerSections(
+        trend_observation=_trend_observation(trend_summary, personal_baseline),
+        interpretation=interpretation,
+        low_risk_suggestions=suggestions,
+        follow_up_questions=followups,
+        care_boundary=boundary,
+    )
+
+
+def _sections_to_answer(sections: SleepAgentAnswerSections) -> str:
+    suggestion_text = " ".join(f"- {item}" for item in sections.low_risk_suggestions)
+    question_text = " ".join(f"- {item}" for item in sections.follow_up_questions)
+    return (
+        f"Trend observation: {sections.trend_observation} "
+        f"What it may mean: {sections.interpretation} "
+        f"Low-risk next steps: {suggestion_text} "
+        f"Follow-up questions: {question_text} "
+        f"Care boundary: {sections.care_boundary}"
+    )
+
+
+def _trend_observation(trend_summary, baseline: PersonalBaseline) -> str:
+    if trend_summary.avg_sleep_7d is None:
+        return "There is not enough recent sleep data yet to compare this week with your prior pattern."
+    parts = [f"Your recent 7-day average sleep duration is {trend_summary.avg_sleep_7d:.0f} minutes."]
+    if trend_summary.avg_sleep_prev_7d is not None and trend_summary.sleep_duration_change is not None:
+        direction = "lower" if trend_summary.sleep_duration_change < 0 else "higher"
+        parts.append(f"That is {abs(trend_summary.sleep_duration_change):.0f} minutes {direction} than the prior 7-day window.")
+    if baseline.usual_sleep_minutes is not None and baseline.data_days >= 7:
+        delta = trend_summary.avg_sleep_7d - baseline.usual_sleep_minutes
+        parts.append(f"Compared with your {baseline.data_days}-day personal baseline, this is {abs(delta):.0f} minutes {'below' if delta < 0 else 'above'} your usual level.")
+    if trend_summary.irregular_schedule_flag:
+        parts.append("Your recent bed or wake times look more variable than ideal.")
+    if trend_summary.rls_symptom_nights:
+        parts.append(f"RLS-style symptoms were recorded on {trend_summary.rls_symptom_nights} recent night(s).")
+    return " ".join(parts)
+
+
+def _low_risk_suggestions(topic: str, templates: list[EducationPrescription], avoid_repeating: list[str]) -> list[str]:
+    suggestions = [item.text for item in templates if item.text not in avoid_repeating][:3]
+    if suggestions:
+        return suggestions
+    fallback = {
+        "rls": [
+            "Keep a symptom log with timing, rest, movement relief, and evening pattern.",
+            "Use gentle stretching or a quiet wind-down routine as comfort-focused support.",
+        ],
+        "insomnia": [
+            "Keep wake time consistent and reduce late-evening light, caffeine, and alcohol.",
+            "Use the bed mainly for sleep and a calm wind-down routine.",
+        ],
+        "osa": [
+            "Track snoring, choking awakenings, morning headaches, and daytime sleepiness patterns.",
+            "Avoid alcohol close to bedtime when snoring or fragmented sleep is present.",
+        ],
+        "general": [
+            "Keep a consistent wake time and a steady sleep window.",
+            "Track sleep duration, bedtime, wake time, caffeine, alcohol, activity, and symptoms.",
+        ],
+    }
+    return fallback[topic]
+
+
+def _follow_up_questions(topic: str, question: str, rls_followups) -> list[str]:
+    if topic == "rls":
+        return _question_texts(rls_followups)
+    if topic == "osa":
+        return [
+            "Has anyone witnessed breathing pauses, choking, or gasping during sleep?",
+            "How often do you feel sleepy during driving, work, school, or conversations?",
+            "Do you wake with morning headaches or very dry mouth?",
+        ]
+    if topic == "insomnia":
+        return [
+            "Is the main issue falling asleep, staying asleep, waking too early, or feeling unrefreshed?",
+            "How many nights per week does this happen, and for how many weeks?",
+            "What time do you usually get into bed and get out of bed?",
+        ]
+    return [
+        "What changed recently in schedule, caffeine or alcohol, stress, exercise, travel, or medications?",
+        "Which symptom is most disruptive: short sleep, awakenings, leg discomfort, snoring, or daytime sleepiness?",
+    ]
+
+
+def _question_texts(rls_followups) -> list[str]:
+    return [item.question for item in rls_followups]
+
+
+def _care_boundary(red_flags: list[str], hitl_required: bool) -> str:
+    if hitl_required or red_flags:
+        return "Because this pattern includes safety or referral signals, use this as education only and prioritize clinician or sleep-specialist review for individualized decisions."
+    return "This is education and trend observation only; seek clinician review if symptoms persist, worsen, impair daytime function, involve breathing pauses, pregnancy, kidney disease, anemia, neurologic symptoms, or medication/device questions."
+
+
+def _build_health_education_prescription(
+    topic: str,
+    trend_summary,
+    sections: SleepAgentAnswerSections,
+    rls_result,
+    red_flags: list[str],
+    rls_followups,
+    baseline: PersonalBaseline,
+) -> HealthEducationPrescription:
+    names = {
+        "rls": "Possible RLS-style sleep discomfort",
+        "osa": "Possible sleep-breathing warning signs",
+        "insomnia": "Insomnia-style sleep difficulty",
+        "general": "General sleep-health trend",
+    }
+    symptoms = {
+        "rls": [
+            "Urge to move the legs or uncomfortable leg sensations",
+            "Symptoms during rest or inactivity",
+            "Partial or complete relief with movement",
+            "Evening or night predominance",
+            "Possible mimics such as cramps, neuropathy, joint pain, venous discomfort, or medication-related restlessness",
+        ],
+        "osa": [
+            "Loud or frequent snoring",
+            "Witnessed breathing pauses, choking, or gasping awakenings",
+            "Morning headaches, dry mouth, or marked daytime sleepiness",
+        ],
+        "insomnia": [
+            "Difficulty falling asleep",
+            "Frequent awakenings or early-morning awakening",
+            "Unrefreshing sleep and daytime impairment",
+        ],
+        "general": [
+            "Sleep duration, sleep efficiency, bed time, wake time, awakenings, daytime sleepiness, and symptom timing",
+        ],
+    }
+    risk_factors = [
+        "Short or irregular sleep schedule" if trend_summary.short_sleep_flag or trend_summary.irregular_schedule_flag else "Recent schedule, caffeine, alcohol, activity, stress, and symptom changes",
+        "Persistent sleep disruption or daytime functional impairment",
+    ]
+    if "possible_osa_warning" in red_flags or trend_summary.possible_osa_warning_flag:
+        risk_factors.append("Snoring, choking awakenings, breathing pauses, or marked daytime sleepiness")
+    if "medical_comorbidity" in red_flags:
+        risk_factors.append("Kidney disease, anemia, neuropathy, or other medical comorbidity")
+    if "pregnancy_or_child" in red_flags:
+        risk_factors.append("Pregnancy or childhood symptoms")
+    if rls_result and topic == "rls":
+        risk_factors.append("RLS mimics or secondary contributors should be reviewed by a clinician when symptoms persist")
+
+    other_guidance = [
+        f"Personal baseline confidence is {baseline.confidence} based on {baseline.data_days} day(s) of available data.",
+        "Bring symptom timing, sleep logs, medication/device questions, and relevant medical history to a clinician if follow-up is needed.",
+    ]
+    if topic == "rls":
+        unanswered = [item.question for item in rls_followups if not item.answered]
+        other_guidance.extend(unanswered[:2])
+
+    return HealthEducationPrescription(
+        title=f"RLS Screen - {names[topic]} health education prescription",
+        target_user="Current app user; educational guidance based on available structured sleep data and current question.",
+        health_problem=names[topic],
+        brief_summary=sections.interpretation,
+        key_symptoms_to_track=symptoms[topic],
+        risk_factors_to_review=risk_factors,
+        guidance_items=sections.low_risk_suggestions,
+        other_guidance=other_guidance,
+        use_instructions="Use with symptom tracking and, when needed, clinician review. This educational prescription does not replace medical diagnosis, treatment, or a clinician-issued medical prescription.",
+        safety_scope="Allowed: education, trend observation, symptom tracking, low-risk lifestyle support, and referral guidance. Not allowed: diagnosis, medication choice or dosing, iron treatment instructions, CPAP/device settings, or device purchase recommendations.",
+    )
 
 
 def _data_used(context: AgentContext) -> list[str]:
@@ -332,15 +494,17 @@ def _build_structured_explanation_prompt(payload, trend_summary, templates, rls_
     }
 
 
-def _execute_tool_trace(plan, trend_summary, rls_result, red_flags, templates, knowledge_snippets) -> list[ToolExecution]:
+def _execute_tool_trace(plan, trend_summary, rls_result, red_flags, templates, knowledge_snippets, rls_followups, personal_baseline) -> list[ToolExecution]:
     trace: list[ToolExecution] = []
     for tool_name in plan.tool_sequence:
         summary = {
             "analyze_sleep_trends": f"Generated risk flags: {', '.join(trend_summary.risk_flags) or 'none'}.",
             "screen_rls": rls_result.explanation if rls_result else "No questionnaire was available for RLS educational screening.",
             "detect_red_flags": f"Detected red flags: {', '.join(red_flags) or 'none'}.",
+            "ask_rls_followup_questions": f"Prepared {len(rls_followups)} RLS follow-up question(s) across the five core educational screening criteria.",
             "select_templates": f"Selected {len(templates)} education template(s).",
             "retrieve_knowledge": f"Retrieved {len(knowledge_snippets)} knowledge snippet(s).",
+            "personalize_with_memory": f"Built a {personal_baseline.confidence}-confidence personal baseline from {personal_baseline.data_days} day(s).",
             "enforce_guardrails": "Applied output boundary checks for diagnosis, medication, iron, device, and CPAP advice.",
         }.get(tool_name, "Executed.")
         trace.append(ToolExecution(tool_name=tool_name, status="completed", summary=summary))

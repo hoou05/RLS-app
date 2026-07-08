@@ -95,3 +95,26 @@ class AuditLog(SQLModel, table=True):
     action: str
     metadata_json: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class UserMemory(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True, unique=True)
+    preferred_language: str | None = None
+    preferred_answer_style: str | None = None
+    avoid_repeating_json: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    baseline_json: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    learned_facts_json: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    feedback_summary_json: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class AgentFeedback(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    rating: str
+    reason: str | None = None
+    question: str | None = None
+    answer_excerpt: str | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=utcnow)

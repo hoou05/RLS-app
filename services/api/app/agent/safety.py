@@ -34,8 +34,8 @@ def detect_red_flags(question: str, notes: list[str]) -> list[str]:
 def detect_forbidden_request(question: str) -> list[str]:
     lowered = question.lower()
     checks = {
-        "unsafe_direct_diagnosis_request": ["diagnose me", "do i have", "am i rls", "是不是不宁腿", "我是不是得了", "你诊断"],
-        "unsafe_medication_request": ["gabapentin", "pregabalin", "dopamine agonist", "安眠药", "处方药", "吃什么药", "用什么药"],
+        "unsafe_direct_diagnosis_request": ["diagnose me", "do i have", "am i rls", "tell me the diagnosis", "是不是不宁腿", "我是不是得了", "你诊断"],
+        "unsafe_medication_request": ["gabapentin", "pregabalin", "dopamine agonist", "sleeping pills", "prescribe", "best medication", "安眠药", "处方药", "吃什么药", "用什么药"],
         "unsafe_dose_request": ["what dose", "how many mg", "mg", "剂量", "吃多少"],
         "unsafe_iron_request": ["take iron", "iron supplement", "补铁", "铁剂"],
         "unsafe_medication_change_request": [
@@ -47,8 +47,9 @@ def detect_forbidden_request(question: str) -> list[str]:
             "换药",
             "加药",
         ],
-        "unsafe_device_request": ["buy cpap", "buy a device", "购买设备", "买呼吸机"],
-        "unsafe_cpap_request": ["cpap pressure", "adjust cpap", "cpap参数", "调cpap", "调节cpap"],
+        "unsafe_device_request": ["buy cpap", "buy a device", "breathing device", "购买设备", "买呼吸机", "买哪种呼吸机"],
+        "unsafe_cpap_request": ["cpap pressure", "adjust cpap", "cpap settings", "cpap参数", "调cpap", "调节cpap", "怎么调参数"],
+        "unsafe_treatment_plan_request": ["treatment plan", "without a clinician", "instead of seeing a doctor", "不想看医生"],
     }
     return [name for name, terms in checks.items() if any(term in lowered for term in terms)]
 
@@ -76,6 +77,7 @@ def enforce_guardrails(text: str) -> str:
         "stop_or_change_medication": ["stop your medication", "change your medication", "停药", "换药", "加药"],
         "device_purchase_recommendation": ["buy a cpap", "purchase a device", "购买设备"],
         "cpap_pressure_adjustment": ["adjust cpap", "cpap pressure", "调节cpap"],
+        "treatment_plan": ["treatment plan", "治疗方案"],
     }
     if any(any(fragment in lowered for fragment in forbidden_fragments[key]) for key in rules["forbidden_outputs"] if key in forbidden_fragments):
         text = (

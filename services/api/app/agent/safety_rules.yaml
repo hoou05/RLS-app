@@ -6,6 +6,7 @@ forbidden_outputs:
   - stop_or_change_medication
   - device_purchase_recommendation
   - cpap_pressure_adjustment
+  - treatment_plan
   - emergency_management_without_referral
 
 allowed_outputs:
