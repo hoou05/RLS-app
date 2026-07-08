@@ -28,7 +28,7 @@ struct InputSectionView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            GroupBox("Wearable Signals") {
+            InputPanel(title: "Wearable Signals", systemImage: "waveform.path.ecg") {
                 VStack(spacing: 12) {
                     OptionalNumberField(
                         title: "Sleep duration",
@@ -65,7 +65,7 @@ struct InputSectionView: View {
                 }
             }
 
-            GroupBox("Sleep Architecture") {
+            InputPanel(title: "Sleep Architecture", systemImage: "bed.double") {
                 VStack(spacing: 12) {
                     OptionalNumberField(
                         title: "WASO",
@@ -166,7 +166,7 @@ struct InputSectionView: View {
                 }
             }
 
-            GroupBox("Profile") {
+            InputPanel(title: "Profile", systemImage: "person.crop.circle") {
                 VStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 8) {
                         FieldTitle(title: "Sex", help: "Biological sex from Health or manual entry. Unknown is treated as missing by the model.")
@@ -205,7 +205,7 @@ struct InputSectionView: View {
                 }
             }
 
-            GroupBox("Questionnaire") {
+            InputPanel(title: "Questionnaire", systemImage: "checklist") {
                 VStack(spacing: 8) {
                     TernaryQuestionRow(
                         title: "Family history",
@@ -240,6 +240,22 @@ struct InputSectionView: View {
     }
 }
 
+private struct InputPanel<Content: View>: View {
+    let title: String
+    let systemImage: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+                .foregroundStyle(RestlegTheme.ink)
+            content
+        }
+        .panelStyle()
+    }
+}
+
 private struct NumberField: View {
     let title: String
     let unit: String
@@ -257,7 +273,13 @@ private struct NumberField: View {
                 .multilineTextAlignment(.trailing)
                 .focused(focusedField, equals: field)
                 .frame(width: 88)
-                .textFieldStyle(.roundedBorder)
+                .padding(.vertical, 7)
+                .padding(.horizontal, 10)
+                .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(RestlegTheme.border.opacity(0.9), lineWidth: 1)
+                )
             Text(unit)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -283,7 +305,13 @@ private struct OptionalNumberField: View {
                 .multilineTextAlignment(.trailing)
                 .focused(focusedField, equals: field)
                 .frame(width: 88)
-                .textFieldStyle(.roundedBorder)
+                .padding(.vertical, 7)
+                .padding(.horizontal, 10)
+                .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(RestlegTheme.border.opacity(0.9), lineWidth: 1)
+                )
             Text(unit)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)

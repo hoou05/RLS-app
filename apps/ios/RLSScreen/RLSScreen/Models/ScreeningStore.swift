@@ -38,6 +38,15 @@ final class ScreeningStore: ObservableObject {
         self.history = Self.loadHistory(from: historyURL)
         self.baselineResult = Self.loadBaseline(from: baselineURL)
         self.engine = Self.makeEngine()
+        if history.isEmpty, baselineResult == nil {
+            seedDemoDatasetIfNeeded()
+        } else {
+            latestTier1 = history.first
+            latestTier2 = history.first
+            if let latestForm = history.first?.input {
+                form = latestForm
+            }
+        }
     }
 
     var hasCompletedOnboarding: Bool {
@@ -282,6 +291,97 @@ final class ScreeningStore: ObservableObject {
             return nil
         }
         return try? RLSInferenceEngine(modelBundleURL: url)
+    }
+
+    private func seedDemoDatasetIfNeeded() {
+        guard let engine else {
+            return
+        }
+
+        do {
+            let forms = Self.makeDemoScreeningForms()
+            let predictions = try forms.map { form in
+                (try engine.predict(form.featureInput, tier: .tier2), form)
+            }
+
+            baselineResult = BaselineScreeningResult(
+                windowDays: 14,
+                requestedNightLimit: forms.count,
+                predictions: predictions
+            )
+            history = predictions.map { prediction, form in
+                ScreeningRecord(
+                    prediction: prediction,
+                    input: form,
+                    createdAt: form.sleepSessionEndDate ?? Date()
+                )
+            }
+            .sorted { lhs, rhs in
+                (lhs.input.sleepSessionEndDate ?? lhs.createdAt) > (rhs.input.sleepSessionEndDate ?? rhs.createdAt)
+            }
+
+            latestTier1 = history.first
+            latestTier2 = history.first
+            if let latestForm = history.first?.input {
+                form = latestForm
+            }
+            saveHistory()
+            saveBaseline()
+        } catch {
+            errorMessage = "Demo data could not be loaded."
+        }
+    }
+
+    private static func makeDemoScreeningForms() -> [ScreeningForm] {
+        let calendar = Calendar.current
+        let now = Date()
+        let durations: [Double] = [455, 438, 420, 392, 374, 405, 448, 430, 385, 360, 342, 376, 398, 416]
+        let efficiencies: [Double] = [88, 86, 83, 79, 76, 81, 87, 85, 78, 74, 71, 77, 80, 82]
+
+        return durations.indices.compactMap { index in
+            guard
+                let day = calendar.date(byAdding: .day, value: -(durations.count - 1 - index), to: now),
+                let sleepEnd = calendar.date(bySettingHour: 7, minute: 10 + (index % 4) * 5, second: 0, of: day)
+            else {
+                return nil
+            }
+
+            let duration = durations[index]
+            let efficiency = efficiencies[index]
+            let inBedMinutes = duration / max(efficiency / 100.0, 0.1)
+            let awakeMinutes = max(0, inBedMinutes - duration)
+            let deepPercent = max(10, 21 - Double(index % 5) * 1.4)
+            let remPercent = max(15, 24 - Double(index % 4) * 1.2)
+            let lightPercent = max(45, 100 - deepPercent - remPercent)
+
+            return ScreeningForm(
+                sleepSessionEndDate: sleepEnd,
+                sleepDurationMinutes: duration,
+                sleepEfficiency: efficiency,
+                wasoMinutes: awakeMinutes,
+                sleepLatencyMinutes: index > 7 ? 34 + Double(index % 4) * 5 : 18 + Double(index % 3) * 4,
+                remLatencyMinutes: 82 + Double(index % 5) * 8,
+                awakeStageMinutes: awakeMinutes,
+                averageSpO2: index > 8 ? 94.0 : 96.0,
+                minimumSpO2: index > 8 ? 90.0 : 93.0,
+                lightSleepMinutes: duration * lightPercent / 100,
+                lightSleepPercent: lightPercent,
+                deepSleepMinutes: duration * deepPercent / 100,
+                deepSleepPercent: deepPercent,
+                remSleepMinutes: duration * remPercent / 100,
+                remSleepPercent: remPercent,
+                restingHeartRate: 61 + Double(index % 6),
+                meanHeartRate: 67 + Double(index % 7),
+                age: 51,
+                sex: "female",
+                heightCm: 165,
+                weightKg: 62,
+                familyHistoryRLS: index >= 2,
+                diabetes: index >= 9,
+                psychiatricMedication: index >= 3,
+                nonLegSymptoms: false
+            )
+        }
     }
 
     private func applyDirectImportQuestionnaireDefaultsIfNeeded() {

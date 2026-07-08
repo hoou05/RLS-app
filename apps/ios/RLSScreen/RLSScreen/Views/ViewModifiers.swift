@@ -41,3 +41,13 @@ extension View {
         )
     }
 }
+
+struct AppSafetyFooter: View {
+    var body: some View {
+        Text("Screening only. Restleg does not diagnose RLS or any sleep disorder, and it does not replace clinician judgment. Seek professional review for persistent symptoms, severe daytime impairment, breathing pauses, chest pain, drowsy driving, pregnancy, childhood symptoms, medication questions, or device settings.")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+    }
+}

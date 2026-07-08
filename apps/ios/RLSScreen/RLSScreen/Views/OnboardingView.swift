@@ -119,9 +119,7 @@ struct OnboardingView: View {
                             .foregroundStyle(.red)
                     }
 
-                    Text("Screening only. This app does not diagnose RLS or determine whether you have RLS.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    AppSafetyFooter()
                 }
                 .padding(16)
             }

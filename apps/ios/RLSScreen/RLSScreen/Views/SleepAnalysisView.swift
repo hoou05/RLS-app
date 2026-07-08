@@ -27,6 +27,7 @@ struct SleepAnalysisView: View {
                     SleepStagesPanel(analysis: analysis)
                     InsightPanel(insights: analysis.insights)
                 }
+                AppSafetyFooter()
             }
             .padding(16)
         }
@@ -46,10 +47,6 @@ private struct TrendSummaryPanel: View {
                 .font(.subheadline)
                 .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
-
-            Text("Use this as a pattern check, not a diagnosis. If sleep disruption persists or daytime function is affected, bring these notes to a clinician.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
         .panelStyle()
     }
@@ -265,10 +262,6 @@ private struct InsightPanel: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            Text("Trend analysis is for tracking patterns only. It does not diagnose sleep disorders or RLS.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
         .panelStyle()
     }
