@@ -38,7 +38,9 @@ final class ScreeningStore: ObservableObject {
         self.history = Self.loadHistory(from: historyURL)
         self.baselineResult = Self.loadBaseline(from: baselineURL)
         self.engine = Self.makeEngine()
-        if history.isEmpty, baselineResult == nil {
+        if Self.shouldReplaceDemoBaseline(baselineResult, history: history) {
+            seedDemoDatasetIfNeeded()
+        } else if history.isEmpty, baselineResult == nil {
             seedDemoDatasetIfNeeded()
         } else {
             latestTier1 = history.first
@@ -305,8 +307,8 @@ final class ScreeningStore: ObservableObject {
             }
 
             baselineResult = BaselineScreeningResult(
-                windowDays: 14,
-                requestedNightLimit: forms.count,
+                windowDays: Self.baselineWindowDays,
+                requestedNightLimit: Self.baselineNightLimit,
                 predictions: predictions
             )
             history = predictions.map { prediction, form in
@@ -335,19 +337,21 @@ final class ScreeningStore: ObservableObject {
     private static func makeDemoScreeningForms() -> [ScreeningForm] {
         let calendar = Calendar.current
         let now = Date()
-        let durations: [Double] = [455, 438, 420, 392, 374, 405, 448, 430, 385, 360, 342, 376, 398, 416]
-        let efficiencies: [Double] = [88, 86, 83, 79, 76, 81, 87, 85, 78, 74, 71, 77, 80, 82]
+        let baseDurations: [Double] = [455, 438, 420, 392, 374, 405, 448, 430, 385, 360, 342, 376, 398, 416]
+        let baseEfficiencies: [Double] = [88, 86, 83, 79, 76, 81, 87, 85, 78, 74, 71, 77, 80, 82]
 
-        return durations.indices.compactMap { index in
+        return (0..<Self.baselineNightLimit).compactMap { index in
             guard
-                let day = calendar.date(byAdding: .day, value: -(durations.count - 1 - index), to: now),
+                let day = calendar.date(byAdding: .day, value: -(Self.baselineNightLimit - 1 - index), to: now),
                 let sleepEnd = calendar.date(bySettingHour: 7, minute: 10 + (index % 4) * 5, second: 0, of: day)
             else {
                 return nil
             }
 
-            let duration = durations[index]
-            let efficiency = efficiencies[index]
+            let cycle = Double(index / baseDurations.count)
+            let recentPenalty = index > Self.baselineNightLimit - 15 ? Double(index % 5) * 4 : 0
+            let duration = baseDurations[index % baseDurations.count] - recentPenalty + cycle.truncatingRemainder(dividingBy: 3) * 3
+            let efficiency = max(68, baseEfficiencies[index % baseEfficiencies.count] - (recentPenalty / 8))
             let inBedMinutes = duration / max(efficiency / 100.0, 0.1)
             let awakeMinutes = max(0, inBedMinutes - duration)
             let deepPercent = max(10, 21 - Double(index % 5) * 1.4)
@@ -382,6 +386,21 @@ final class ScreeningStore: ObservableObject {
                 nonLegSymptoms: false
             )
         }
+    }
+
+    private static func shouldReplaceDemoBaseline(_ baseline: BaselineScreeningResult?, history: [ScreeningRecord]) -> Bool {
+        guard let baseline else {
+            return false
+        }
+        return baseline.windowDays == 14
+            && baseline.validNightCount == 14
+            && history.count == 14
+            && history.allSatisfy { record in
+                record.input.age == 51
+                    && record.input.sex == "female"
+                    && record.input.heightCm == 165
+                    && record.input.weightKg == 62
+            }
     }
 
     private func applyDirectImportQuestionnaireDefaultsIfNeeded() {

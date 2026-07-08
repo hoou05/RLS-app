@@ -74,46 +74,79 @@ private struct SleepHubView: View {
 struct AgentView: View {
     @EnvironmentObject private var store: ScreeningStore
 
-    @State private var question = "I am very nervous and cannot fall asleep these days, what's wrong with me?"
+    @State private var draft = "I am very nervous and cannot fall asleep these days, what's wrong with me?"
     @State private var selectedMode = SleepAgentMode.question
-    @State private var response: SleepAgentResponse?
-    @State private var isAsking = false
+    @State private var messages: [AgentChatMessage] = []
+    @State private var isSending = false
     @State private var errorMessage: String?
+    @FocusState private var isComposerFocused: Bool
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { reader in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        requestPanel
+            VStack(spacing: 0) {
+                modeHeader
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
 
-                        if let errorMessage {
-                            Text(errorMessage)
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.red)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                Divider()
 
-                        if let response {
-                            AgentResponseView(response: response)
-                                .id("agent-response")
+                ScrollViewReader { reader in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            if messages.isEmpty {
+                                AgentEmptyState { mode, prompt in
+                                    selectedMode = mode
+                                    draft = prompt
+                                    isComposerFocused = true
+                                }
+                                .id("agent-empty-state")
+                            }
+
+                            ForEach(messages) { message in
+                                AgentChatMessageView(message: message)
+                                    .id(message.id)
+                            }
+
+                            if isSending {
+                                AgentTypingRow(mode: selectedMode)
+                                    .id("agent-typing")
+                            }
+
+                            if let errorMessage {
+                                AgentErrorRow(message: errorMessage)
+                                    .id("agent-error")
+                            }
                         }
+                        .padding(16)
                     }
-                    .padding(16)
+                    .onChange(of: messages.count) {
+                        scrollToBottom(reader)
+                    }
+                    .onChange(of: isSending) {
+                        scrollToBottom(reader)
+                    }
+                    .onChange(of: errorMessage) {
+                        scrollToBottom(reader)
+                    }
                 }
-                .onChange(of: response?.answer) {
-                    guard response != nil else { return }
-                    withAnimation(.snappy) {
-                        reader.scrollTo("agent-response", anchor: .top)
+
+                composerBar
+            }
+            .restlegBackground()
+            .navigationTitle("Agent")
+            .toolbar {
+                if !messages.isEmpty {
+                    Button("Clear") {
+                        messages.removeAll()
+                        errorMessage = nil
                     }
                 }
             }
-            .restlegBackground()
-            .navigationTitle("Ask or analyze")
         }
     }
 
-    private var requestPanel: some View {
+    private var modeHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: "sparkles")
@@ -125,10 +158,10 @@ struct AgentView: View {
                         in: RoundedRectangle(cornerRadius: 8)
                     )
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Ask or analyze")
+                    Text("Restleg Agent")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(RestlegTheme.ink)
-                    Text("Trends, sleep trouble, RLS symptoms, and safe next steps")
+                    Text("Iterative sleep and RLS guidance")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -139,80 +172,337 @@ struct AgentView: View {
                 Text("Guide").tag(SleepAgentMode.guide)
             }
             .pickerStyle(.segmented)
+        }
+    }
 
-            TextEditor(text: $question)
-                .frame(minHeight: 110)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .padding(10)
-                .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(RestlegTheme.border.opacity(0.9))
-                )
+    private var composerBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if messages.isEmpty {
+                Text("Restleg can organize patterns and next questions. It does not diagnose or prescribe treatment.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
 
-            HStack {
+            HStack(alignment: .bottom, spacing: 10) {
+                TextField("Ask a follow-up...", text: $draft, axis: .vertical)
+                    .lineLimit(1...5)
+                    .focused($isComposerFocused)
+                    .textInputAutocapitalization(.sentences)
+                    .autocorrectionDisabled(false)
+                    .font(.body)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(RestlegTheme.border.opacity(0.9))
+                    )
+                    .onSubmit {
+                        guard canSend else { return }
+                        Task {
+                            await sendMessage()
+                        }
+                    }
+
                 Button {
                     Task {
-                        await askAgent()
+                        await sendMessage()
                     }
                 } label: {
-                    Label(buttonTitle, systemImage: "paperplane.fill")
-                        .frame(maxWidth: .infinity)
+                    Image(systemName: isSending ? "hourglass" : "paperplane.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 42, height: 42)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(RestlegTheme.navy)
-                .controlSize(.large)
-                .disabled(isAsking)
-
-                if isAsking {
-                    ProgressView()
-                }
+                .disabled(!canSend)
+                .accessibilityLabel("Send message")
             }
-
-            Text("Restleg can organize patterns and next questions. It does not diagnose or prescribe treatment.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
-        .panelStyle()
+        .padding(16)
+        .background(.regularMaterial)
     }
 
-    private var buttonTitle: String {
-        switch selectedMode {
-        case .question:
-            return isAsking ? "Asking..." : "Ask agent"
-        case .trend:
-            return isAsking ? "Analyzing..." : "Analyze trend"
-        case .guide:
-            return isAsking ? "Building guide..." : "Get guide"
-        }
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
     }
 
-    private func askAgent() async {
+    private func sendMessage() async {
+        let question = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !question.isEmpty, !isSending else {
+            return
+        }
+
         errorMessage = nil
-        isAsking = true
-        defer { isAsking = false }
+        let mode = selectedMode
+        let priorMessages = messages
+        let userMessage = AgentChatMessage(
+            role: .user,
+            content: question,
+            mode: mode,
+            provider: nil,
+            response: nil
+        )
+        messages.append(userMessage)
+        draft = ""
+        isSending = true
+        defer { isSending = false }
 
         do {
             let context = LocalSleepAgent.buildResponse(
-                mode: selectedMode,
+                mode: mode,
                 question: question,
                 form: store.form,
                 history: store.history,
                 baseline: store.baselineResult
             )
-            let client = try DeepSeekDirectClient()
+            let client = DeepSeekDirectClient()
             let answer = try await client.ask(
-                mode: selectedMode,
+                mode: mode,
                 question: question,
                 context: context,
                 form: store.form,
                 history: store.history,
-                baseline: store.baselineResult
+                baseline: store.baselineResult,
+                priorMessages: priorMessages
             )
-            response = context.withGeneratedAnswer(answer, provider: DeepSeekDirectClient.model)
+            let generated = context.withGeneratedAnswer(answer, provider: DeepSeekDirectClient.model)
+            messages.append(
+                AgentChatMessage(
+                    role: .assistant,
+                    content: answer,
+                    mode: mode,
+                    provider: DeepSeekDirectClient.model,
+                    response: generated
+                )
+            )
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func scrollToBottom(_ reader: ScrollViewProxy) {
+        withAnimation(.snappy) {
+            if errorMessage != nil {
+                reader.scrollTo("agent-error", anchor: .bottom)
+            } else if isSending {
+                reader.scrollTo("agent-typing", anchor: .bottom)
+            } else if let last = messages.last {
+                reader.scrollTo(last.id, anchor: .bottom)
+            }
+        }
+    }
+}
+
+private struct AgentChatMessage: Identifiable {
+    enum Role {
+        case user
+        case assistant
+
+        var apiRole: String {
+            switch self {
+            case .user:
+                return "user"
+            case .assistant:
+                return "assistant"
+            }
+        }
+    }
+
+    let id = UUID()
+    let role: Role
+    let content: String
+    let mode: SleepAgentMode
+    let createdAt = Date()
+    let provider: String?
+    let response: SleepAgentResponse?
+}
+
+private struct AgentEmptyState: View {
+    let selectPrompt: (SleepAgentMode, String) -> Void
+
+    private let prompts: [(SleepAgentMode, String, String)] = [
+        (.question, "Ask about symptoms", "I feel restless and nervous at night. How should I think about this with my sleep data?"),
+        (.trend, "Analyze recent trend", "What patterns do you see in my recent sleep and RLS screening data?"),
+        (.guide, "Build a tracking plan", "Give me a low-risk plan for tracking symptoms and preparing notes for a clinician."),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Start a conversation", systemImage: "message.badge")
+                .font(.headline)
+                .foregroundStyle(RestlegTheme.ink)
+            Text("Each reply uses the current form, local screening history, baseline, and the recent conversation.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(prompts, id: \.1) { mode, title, prompt in
+                    Button {
+                        selectPrompt(mode, prompt)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: icon(for: mode))
+                                .foregroundStyle(RestlegTheme.blue)
+                                .frame(width: 22)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(RestlegTheme.ink)
+                                Text(prompt)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.up.forward")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(10)
+                        .background(RestlegTheme.panelTint, in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .panelStyle()
+    }
+
+    private func icon(for mode: SleepAgentMode) -> String {
+        switch mode {
+        case .question:
+            return "questionmark.bubble"
+        case .trend:
+            return "chart.line.uptrend.xyaxis"
+        case .guide:
+            return "list.clipboard"
+        }
+    }
+}
+
+private struct AgentChatMessageView: View {
+    let message: AgentChatMessage
+
+    var body: some View {
+        switch message.role {
+        case .user:
+            HStack(alignment: .top) {
+                Spacer(minLength: 44)
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text(message.content)
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(message.mode.displayTitle)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.78))
+                }
+                .padding(12)
+                .background(RestlegTheme.navy, in: RoundedRectangle(cornerRadius: 8))
+            }
+        case .assistant:
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Label("AI reply", systemImage: "sparkles")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(RestlegTheme.ink)
+                    Spacer()
+                    Text(message.provider ?? message.mode.displayTitle)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                MarkdownText(text: message.content)
+                if let response = message.response {
+                    AgentMessageContextLine(response: response)
+                }
+            }
+            .padding(14)
+            .background(RestlegTheme.panel, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(RestlegTheme.border.opacity(0.9), lineWidth: 1)
+            )
+            .shadow(color: RestlegTheme.ink.opacity(0.04), radius: 10, x: 0, y: 6)
+        }
+    }
+}
+
+private struct AgentMessageContextLine: View {
+    let response: SleepAgentResponse
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "square.stack.3d.up")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(RestlegTheme.blue)
+                    .frame(width: 18)
+                Text(summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var summary: String {
+        var parts: [String] = []
+        if let rls = response.rlsScreening {
+            parts.append("RLS: \(rls.status.replacingOccurrences(of: "_", with: " "))")
+        }
+        if !response.dataUsed.isEmpty {
+            parts.append("Data: \(response.dataUsed.joined(separator: ", "))")
+        }
+        if response.hitlRequired {
+            parts.append("Clinician boundary applied")
+        }
+        return parts.isEmpty ? "Structured context was included." : parts.joined(separator: " | ")
+    }
+}
+
+private struct AgentTypingRow: View {
+    let mode: SleepAgentMode
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+            Text("\(mode.displayTitle) reply is being generated...")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(RestlegTheme.panel, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(RestlegTheme.border.opacity(0.9), lineWidth: 1)
+        )
+    }
+}
+
+private struct AgentErrorRow: View {
+    let message: String
+
+    var body: some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.red)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private extension SleepAgentMode {
+    var displayTitle: String {
+        switch self {
+        case .question:
+            return "Question"
+        case .trend:
+            return "Trend"
+        case .guide:
+            return "Guide"
         }
     }
 }
@@ -247,16 +537,22 @@ private extension SleepAgentResponse {
 
 private final class DeepSeekDirectClient {
     static let model = ProcessInfo.processInfo.environment["DEEPSEEK_MODEL"]?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? "deepseek-v4-flash"
+    private static let bundledAPIKey = "sk-cbf100925ad5454e95f456bab74fc152"
 
     private let apiKey: String
     private let session: URLSession
 
-    init(session: URLSession = .shared) throws {
-        guard let apiKey = ProcessInfo.processInfo.environment["DEEPSEEK_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !apiKey.isEmpty else {
-            throw DeepSeekDirectClientError.missingAPIKey
-        }
-        self.apiKey = apiKey
+    init(session: URLSession = .shared) {
+        self.apiKey = Self.resolvedAPIKey
         self.session = session
+    }
+
+    private static var resolvedAPIKey: String {
+        let environmentKey = ProcessInfo.processInfo.environment["DEEPSEEK_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let environmentKey, !environmentKey.isEmpty {
+            return environmentKey
+        }
+        return bundledAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func ask(
@@ -265,11 +561,28 @@ private final class DeepSeekDirectClient {
         context: SleepAgentResponse,
         form: ScreeningForm,
         history: [ScreeningRecord],
-        baseline: BaselineScreeningResult?
+        baseline: BaselineScreeningResult?,
+        priorMessages: [AgentChatMessage]
     ) async throws -> String {
         guard let url = URL(string: "https://api.deepseek.com/chat/completions") else {
             throw DeepSeekDirectClientError.invalidURL
         }
+
+        let messages = [DeepSeekMessage(role: "system", content: Self.systemPrompt(mode: mode))]
+            + Self.historyMessages(from: priorMessages)
+            + [
+                DeepSeekMessage(
+                    role: "user",
+                    content: Self.userPrompt(
+                        mode: mode,
+                        question: question,
+                        context: context,
+                        form: form,
+                        history: history,
+                        baseline: baseline
+                    )
+                ),
+            ]
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -278,20 +591,7 @@ private final class DeepSeekDirectClient {
         request.httpBody = try JSONEncoder().encode(
             DeepSeekChatRequest(
                 model: Self.model,
-                messages: [
-                    DeepSeekMessage(role: "system", content: Self.systemPrompt(mode: mode)),
-                    DeepSeekMessage(
-                        role: "user",
-                        content: Self.userPrompt(
-                            mode: mode,
-                            question: question,
-                            context: context,
-                            form: form,
-                            history: history,
-                            baseline: baseline
-                        )
-                    ),
-                ],
+                messages: messages,
                 stream: false,
                 maxTokens: 900,
                 temperature: 0.4
@@ -365,8 +665,19 @@ private final class DeepSeekDirectClient {
         Data used:
         \(context.dataUsed.joined(separator: ", "))
 
+        Recent conversation messages, if any, were included before this prompt. Use them for continuity, but the Known user information section above overrides stale or conflicting earlier assumptions.
+
         Write the final answer for the user. Do not copy the structured context verbatim; use it to reason and respond naturally.
         """
+    }
+
+    private static func historyMessages(from priorMessages: [AgentChatMessage]) -> [DeepSeekMessage] {
+        priorMessages.suffix(8).map { message in
+            DeepSeekMessage(
+                role: message.role.apiRole,
+                content: "[Mode: \(message.mode.rawValue)] \(message.content)"
+            )
+        }
     }
 
     private static func knownUserInformation(
@@ -542,7 +853,6 @@ private struct DeepSeekChoice: Decodable {
 }
 
 private enum DeepSeekDirectClientError: LocalizedError {
-    case missingAPIKey
     case invalidURL
     case invalidResponse
     case emptyMessage
@@ -550,8 +860,6 @@ private enum DeepSeekDirectClientError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingAPIKey:
-            return "DeepSeek API key is missing from the Xcode run environment."
         case .invalidURL:
             return "DeepSeek API URL is invalid."
         case .invalidResponse:
