@@ -9,9 +9,17 @@ struct HealthDataImportResult: Equatable {
     var notes: [String]
 }
 
+struct HealthDataBaselineImportResult: Equatable {
+    var forms: [ScreeningForm]
+    var importedFieldNames: [String]
+    var missingFieldNames: [String]
+    var notes: [String]
+}
+
 protocol HealthDataProvider {
     func requestAuthorization() async throws
     func latestScreeningForm(current: ScreeningForm) async throws -> HealthDataImportResult
+    func recentScreeningForms(current: ScreeningForm, limit: Int, lookbackDays: Int) async throws -> HealthDataBaselineImportResult
     func startSleepDataObservation(onUpdate: @escaping @Sendable () async -> Void) async throws
 }
 
@@ -20,6 +28,10 @@ struct ManualOnlyHealthDataProvider: HealthDataProvider {
 
     func latestScreeningForm(current: ScreeningForm) async throws -> HealthDataImportResult {
         HealthDataImportResult(form: current, importedFieldNames: [], missingFieldNames: [], notes: [])
+    }
+
+    func recentScreeningForms(current: ScreeningForm, limit: Int, lookbackDays: Int) async throws -> HealthDataBaselineImportResult {
+        HealthDataBaselineImportResult(forms: [], importedFieldNames: [], missingFieldNames: ["Sleep"], notes: [])
     }
 
     func startSleepDataObservation(onUpdate: @escaping @Sendable () async -> Void) async throws {}
@@ -181,6 +193,106 @@ final class HealthKitDataProvider: HealthDataProvider {
         return HealthDataImportResult(form: form, importedFieldNames: imported, missingFieldNames: missing, notes: notes)
     }
 
+    func recentScreeningForms(current: ScreeningForm, limit: Int, lookbackDays: Int) async throws -> HealthDataBaselineImportResult {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw HealthDataProviderError.unavailable
+        }
+
+        var baseForm = current
+        var imported: [String] = []
+        var missing: [String] = []
+        var notes: [String] = []
+
+        if let restingHeartRate = try await latestQuantity(.restingHeartRate, unit: .count().unitDivided(by: .minute()), lookbackDays: lookbackDays) {
+            baseForm.restingHeartRate = restingHeartRate
+            imported.append("Resting heart rate")
+        } else {
+            missing.append("Resting heart rate")
+        }
+
+        if let age = try? ageInYears() {
+            baseForm.age = age
+            imported.append("Age")
+        } else {
+            missing.append("Age")
+        }
+
+        if let sex = try? biologicalSex() {
+            baseForm.sex = sex
+            imported.append("Sex")
+        } else {
+            missing.append("Sex")
+        }
+
+        if let heightCm = try await latestQuantity(.height, unit: .meterUnit(with: .centi), lookbackDays: 3650) {
+            baseForm.heightCm = heightCm
+            imported.append("Height")
+        } else {
+            missing.append("Height")
+        }
+
+        if let weightKg = try await latestQuantity(.bodyMass, unit: .gramUnit(with: .kilo), lookbackDays: 3650) {
+            baseForm.weightKg = weightKg
+            imported.append("Weight")
+        } else {
+            missing.append("Weight")
+        }
+
+        let sleeps = try await recentSleepSummaries(limit: limit, lookbackDays: lookbackDays)
+        guard !sleeps.isEmpty else {
+            throw HealthDataProviderError.missingReadableData
+        }
+
+        var forms: [ScreeningForm] = []
+        forms.reserveCapacity(sleeps.count)
+
+        for sleep in sleeps {
+            var form = baseForm.withQuestionnaire(from: current)
+            form.apply(sleep: sleep)
+
+            if let oxygen = try await oxygenSummary(start: sleep.startDate, end: sleep.endDate) {
+                form.averageSpO2 = oxygen.average
+                form.minimumSpO2 = oxygen.minimum
+            }
+
+            if let meanHeartRate = try await averageQuantity(
+                .heartRate,
+                unit: .count().unitDivided(by: .minute()),
+                start: sleep.startDate,
+                end: sleep.endDate
+            ) {
+                form.meanHeartRate = meanHeartRate
+            }
+
+            forms.append(form)
+        }
+
+        imported.append("Sleep sessions")
+        notes.append("Analyzed \(forms.count) sleep sessions from the last \(lookbackDays) days.")
+        if forms.contains(where: { $0.averageSpO2 != nil || $0.minimumSpO2 != nil }) {
+            imported.append("Blood oxygen")
+        } else {
+            missing.append("Blood oxygen")
+        }
+        if forms.contains(where: { $0.meanHeartRate != nil }) {
+            imported.append("Sleep heart rate")
+        } else {
+            missing.append("Sleep heart rate")
+        }
+        if forms.contains(where: { $0.deepSleepMinutes != nil || $0.remSleepMinutes != nil || $0.lightSleepMinutes != nil }) {
+            imported.append("Sleep stages")
+        } else {
+            missing.append("Sleep stages")
+        }
+
+        return HealthDataBaselineImportResult(
+            forms: forms,
+            importedFieldNames: imported,
+            missingFieldNames: missing,
+            notes: notes
+        )
+    }
+
     func startSleepDataObservation(onUpdate: @escaping @Sendable () async -> Void) async throws {
         guard HKHealthStore.isHealthDataAvailable() else {
             throw HealthDataProviderError.unavailable
@@ -295,6 +407,29 @@ final class HealthKitDataProvider: HealthDataProvider {
         }
     }
 
+    private func averageQuantity(_ identifier: HKQuantityTypeIdentifier, unit: HKUnit, start: Date, end: Date) async throws -> Double? {
+        guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else {
+            return nil
+        }
+
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [.strictStartDate, .strictEndDate])
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .discreteAverage) { _, statistics, error in
+                if let error {
+                    if Self.isNoDataError(error) {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    continuation.resume(throwing: error)
+                    return
+                }
+                continuation.resume(returning: statistics?.averageQuantity()?.doubleValue(for: unit))
+            }
+            healthStore.execute(query)
+        }
+    }
+
     private func oxygenSummary(start: Date, end: Date) async throws -> (average: Double, minimum: Double)? {
         guard let type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation) else {
             return nil
@@ -342,7 +477,7 @@ final class HealthKitDataProvider: HealthDataProvider {
                 }
 
                 let sleepSamples = (samples as? [HKCategorySample]) ?? []
-                guard let session = Self.latestMajorSleepSession(from: sleepSamples) else {
+                guard let session = Self.majorSleepSessions(from: sleepSamples).first else {
                     continuation.resume(returning: nil)
                     return
                 }
@@ -352,7 +487,32 @@ final class HealthKitDataProvider: HealthDataProvider {
         }
     }
 
-    private struct SleepSummary {
+    private func recentSleepSummaries(limit: Int, lookbackDays: Int) async throws -> [SleepSummary] {
+        let end = Date()
+        let start = end.addingTimeInterval(-Double(lookbackDays) * 86_400)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictEndDate)
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sort]) { _, samples, error in
+                if let error {
+                    if Self.isNoDataError(error) {
+                        continuation.resume(returning: [])
+                        return
+                    }
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                let sleepSamples = (samples as? [HKCategorySample]) ?? []
+                let sessions = Array(Self.majorSleepSessions(from: sleepSamples).prefix(max(limit, 0)))
+                continuation.resume(returning: sessions)
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    fileprivate struct SleepSummary {
         let startDate: Date
         let endDate: Date
         let sleepDurationMinutes: Double
@@ -403,7 +563,7 @@ final class HealthKitDataProvider: HealthDataProvider {
             || isAsleepValue(value)
     }
 
-    private static func latestMajorSleepSession(from samples: [HKCategorySample]) -> SleepSummary? {
+    private static func majorSleepSessions(from samples: [HKCategorySample]) -> [SleepSummary] {
         let sorted = samples
             .filter { isSleepSessionValue($0.value) }
             .sorted { $0.startDate < $1.startDate }
@@ -437,7 +597,6 @@ final class HealthKitDataProvider: HealthDataProvider {
         return sessions
             .compactMap(makeSleepSummary)
             .sorted { $0.endDate > $1.endDate }
-            .first
     }
 
     private static func makeSleepSummary(from samples: [HKCategorySample]) -> SleepSummary? {
@@ -556,5 +715,23 @@ final class HealthKitDataProvider: HealthDataProvider {
         }
 
         return merged.reduce(0) { $0 + $1.duration }
+    }
+}
+
+private extension ScreeningForm {
+    mutating func apply(sleep: HealthKitDataProvider.SleepSummary) {
+        sleepSessionEndDate = sleep.endDate
+        sleepDurationMinutes = sleep.sleepDurationMinutes
+        sleepEfficiency = sleep.sleepEfficiency
+        wasoMinutes = sleep.wasoMinutes
+        sleepLatencyMinutes = sleep.sleepLatencyMinutes
+        remLatencyMinutes = sleep.remLatencyMinutes
+        awakeStageMinutes = sleep.awakeStageMinutes
+        lightSleepMinutes = sleep.lightSleepMinutes
+        lightSleepPercent = sleep.lightSleepPercent
+        deepSleepMinutes = sleep.deepSleepMinutes
+        deepSleepPercent = sleep.deepSleepPercent
+        remSleepMinutes = sleep.remSleepMinutes
+        remSleepPercent = sleep.remSleepPercent
     }
 }

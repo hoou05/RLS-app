@@ -21,8 +21,19 @@ struct RLSScreenApp: App {
             ContentView()
                 .environmentObject(store)
                 .task {
-                    await store.configureAutomation()
-                    backgroundRefresh.scheduleNextRefresh()
+                    if store.hasCompletedOnboarding {
+                        await store.configureAutomation()
+                        backgroundRefresh.scheduleNextRefresh()
+                    }
+                }
+                .onChange(of: store.hasCompletedOnboarding) { _, completed in
+                    guard completed else {
+                        return
+                    }
+                    Task {
+                        await store.configureAutomation()
+                        backgroundRefresh.scheduleNextRefresh()
+                    }
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .background {

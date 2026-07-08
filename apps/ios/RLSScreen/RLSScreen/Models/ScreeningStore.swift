@@ -7,17 +7,22 @@ final class ScreeningStore: ObservableObject {
     @Published private(set) var latestTier1: ScreeningRecord?
     @Published private(set) var latestTier2: ScreeningRecord?
     @Published private(set) var history: [ScreeningRecord] = []
+    @Published private(set) var baselineResult: BaselineScreeningResult?
     @Published var errorMessage: String?
     @Published private(set) var isImportingHealthData = false
+    @Published private(set) var isBuildingBaseline = false
     @Published private(set) var healthImportMessage: String?
 
     private var engine: RLSInferenceEngine?
     private let healthDataProvider: HealthDataProvider
     private let notificationManager: NotificationManager
     private let historyURL: URL
+    private let baselineURL: URL
     private var isAutomationConfigured = false
 
     private static let lastAutomatedSleepEndDateKey = "lastAutomatedSleepEndDate"
+    static let baselineWindowDays = 60
+    static let baselineNightLimit = 60
 
     init(
         healthDataProvider: HealthDataProvider = HealthKitDataProvider(),
@@ -29,8 +34,14 @@ final class ScreeningStore: ObservableObject {
             .appendingPathComponent("RLSScreen", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         self.historyURL = directory.appendingPathComponent("screening-history.json")
+        self.baselineURL = directory.appendingPathComponent("baseline-screening.json")
         self.history = Self.loadHistory(from: historyURL)
+        self.baselineResult = Self.loadBaseline(from: baselineURL)
         self.engine = Self.makeEngine()
+    }
+
+    var hasCompletedOnboarding: Bool {
+        baselineResult != nil
     }
 
     func runScreening() {
@@ -61,6 +72,60 @@ final class ScreeningStore: ObservableObject {
                 let missing = result.missingFieldNames.joined(separator: ", ")
                 healthImportMessage = "Imported from Health: \(imported). Missing: \(missing).\(notes)"
             }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func buildBaselineScreening() async {
+        errorMessage = nil
+        healthImportMessage = nil
+
+        guard form.isQuestionnaireComplete else {
+            errorMessage = "Complete the questionnaire before building a baseline."
+            return
+        }
+
+        guard let engine else {
+            errorMessage = ScreeningStoreError.modelBundleUnavailable.localizedDescription
+            return
+        }
+
+        isBuildingBaseline = true
+        defer { isBuildingBaseline = false }
+
+        do {
+            try await healthDataProvider.requestAuthorization()
+            let result = try await healthDataProvider.recentScreeningForms(
+                current: form,
+                limit: Self.baselineNightLimit,
+                lookbackDays: Self.baselineWindowDays
+            )
+
+            let predictions = try result.forms.map { form in
+                (try engine.predict(form.featureInput, tier: .tier2), form)
+            }
+
+            guard !predictions.isEmpty else {
+                throw HealthDataProviderError.missingReadableData
+            }
+
+            let baseline = BaselineScreeningResult(
+                windowDays: Self.baselineWindowDays,
+                requestedNightLimit: Self.baselineNightLimit,
+                predictions: predictions
+            )
+            baselineResult = baseline
+
+            if let latestForm = result.forms.first {
+                form = latestForm
+            }
+
+            saveBaseline()
+
+            let imported = result.importedFieldNames.joined(separator: ", ")
+            let notes = result.notes.isEmpty ? "" : " \(result.notes.joined(separator: "; "))."
+            healthImportMessage = "Built baseline from \(baseline.validNightCount) sleep sessions. Imported: \(imported).\(notes)"
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -115,6 +180,11 @@ final class ScreeningStore: ObservableObject {
         latestTier1 = nil
         latestTier2 = nil
         saveHistory()
+    }
+
+    func resetBaseline() {
+        baselineResult = nil
+        try? FileManager.default.removeItem(at: baselineURL)
     }
 
     private func runPrediction(input: ScreeningForm) throws -> ScreeningRecord {
@@ -173,11 +243,27 @@ final class ScreeningStore: ObservableObject {
         }
     }
 
+    private func saveBaseline() {
+        do {
+            let data = try JSONEncoder.rlsHistory.encode(baselineResult)
+            try data.write(to: baselineURL, options: [.atomic])
+        } catch {
+            errorMessage = "Baseline could not be saved."
+        }
+    }
+
     private static func loadHistory(from url: URL) -> [ScreeningRecord] {
         guard let data = try? Data(contentsOf: url) else {
             return []
         }
         return (try? JSONDecoder.rlsHistory.decode([ScreeningRecord].self, from: data)) ?? []
+    }
+
+    private static func loadBaseline(from url: URL) -> BaselineScreeningResult? {
+        guard let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return try? JSONDecoder.rlsHistory.decode(BaselineScreeningResult.self, from: data)
     }
 
     private static func makeEngine() -> RLSInferenceEngine? {

@@ -8,6 +8,10 @@ struct ScreeningView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    if let baseline = store.baselineResult {
+                        BaselineSummaryPanel(baseline: baseline)
+                    }
+
                     if let record = store.latestTier2 {
                         ResultSummaryView(record: record)
                     } else {
@@ -54,6 +58,68 @@ struct ScreeningView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+private struct BaselineSummaryPanel: View {
+    let baseline: BaselineScreeningResult
+
+    private var level: RiskLevel {
+        baseline.riskLevel ?? .low
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("60-day baseline")
+                        .font(.headline)
+                    Text(level.title)
+                        .font(.system(size: 34, weight: .bold))
+                }
+                Spacer()
+                Text(baseline.typicalScore ?? 0, format: .percent.precision(.fractionLength(1)))
+                    .font(.system(size: 34, weight: .bold))
+                    .monospacedDigit()
+            }
+
+            ProgressView(value: baseline.typicalScore ?? 0)
+                .tint(color(for: level))
+
+            HStack(spacing: 10) {
+                MetricPill(title: "Usable nights", value: "\(baseline.validNightCount)")
+                MetricPill(title: "Data quality", value: baseline.dataQuality.title)
+                MetricPill(title: "High nights", value: "\(baseline.highRiskNightCount)")
+            }
+
+            if let meanScore = baseline.meanScore, let p75Score = baseline.p75Score {
+                Text("Mean \(meanScore, format: .percent.precision(.fractionLength(1))) / P75 \(p75Score, format: .percent.precision(.fractionLength(1)))")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            if let dateRangeLabel = baseline.dateRangeLabel {
+                Text(dateRangeLabel)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("Baseline uses the questionnaire plus each available sleep session. Screening only, not a diagnosis.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .panelStyle()
+    }
+
+    private func color(for level: RiskLevel) -> Color {
+        switch level {
+        case .low:
+            return .green
+        case .moderate:
+            return .orange
+        case .high:
+            return .red
         }
     }
 }
@@ -169,18 +235,25 @@ private extension ScreeningRecord {
 
 private struct MetricPill: View {
     let title: String
-    let value: Double
+    let value: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text(value, format: .percent.precision(.fractionLength(1)))
+            Text(value)
                 .font(.headline.monospacedDigit())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private extension MetricPill {
+    init(title: String, value: Double) {
+        self.title = title
+        self.value = value.formatted(.percent.precision(.fractionLength(1)))
     }
 }

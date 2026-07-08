@@ -4,23 +4,32 @@ struct ContentView: View {
     @EnvironmentObject private var store: ScreeningStore
 
     var body: some View {
-        TabView {
-            ScreeningView()
-                .tabItem {
-                    Label("Screen", systemImage: "waveform.path.ecg")
-                }
+        if store.hasCompletedOnboarding {
+            TabView {
+                ScreeningView()
+                    .tabItem {
+                        Label("Screen", systemImage: "waveform.path.ecg")
+                    }
 
-            HistoryView()
-                .tabItem {
-                    Label("History", systemImage: "clock.arrow.circlepath")
-                }
+                HistoryView()
+                    .tabItem {
+                        Label("History", systemImage: "clock.arrow.circlepath")
+                    }
 
-            ModelInfoView()
-                .tabItem {
-                    Label("Model", systemImage: "cpu")
-                }
+                SleepAnalysisView()
+                    .tabItem {
+                        Label("Trends", systemImage: "chart.line.uptrend.xyaxis")
+                    }
+
+                ModelInfoView()
+                    .tabItem {
+                        Label("Model", systemImage: "cpu")
+                    }
+            }
+            .tint(.green)
+        } else {
+            OnboardingView()
         }
-        .tint(.green)
     }
 }
 
@@ -28,4 +37,3 @@ struct ContentView: View {
     ContentView()
         .environmentObject(ScreeningStore())
 }
-

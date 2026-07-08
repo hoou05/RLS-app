@@ -22,6 +22,8 @@
 		0A000001000000000000000D /* Models/NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010E /* Models/NotificationManager.swift */; };
 		0A000001000000000000000E /* Models/BackgroundRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A000001000000000000010F /* Models/BackgroundRefreshCoordinator.swift */; };
 		0A000001000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000111 /* Assets.xcassets */; };
+		0A0000010000000000000010 /* Views/SleepAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000112 /* Views/SleepAnalysisView.swift */; };
+		0A0000010000000000000011 /* Views/OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000010000000000000113 /* Views/OnboardingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +44,8 @@
 		0A000001000000000000010F /* Models/BackgroundRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/BackgroundRefreshCoordinator.swift; sourceTree = "<group>"; };
 		0A0000010000000000000110 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0A0000010000000000000111 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		0A0000010000000000000112 /* Views/SleepAnalysisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/SleepAnalysisView.swift; sourceTree = "<group>"; };
+		0A0000010000000000000113 /* Views/OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/OnboardingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -103,8 +107,10 @@
 			children = (
 				0A0000010000000000000105 /* Views/ContentView.swift */,
 				0A0000010000000000000106 /* Views/ScreeningView.swift */,
+				0A0000010000000000000113 /* Views/OnboardingView.swift */,
 				0A0000010000000000000107 /* Views/InputSectionView.swift */,
 				0A0000010000000000000108 /* Views/HistoryView.swift */,
+				0A0000010000000000000112 /* Views/SleepAnalysisView.swift */,
 				0A0000010000000000000109 /* Views/ModelInfoView.swift */,
 				0A000001000000000000010A /* Views/ViewModifiers.swift */,
 			);
@@ -215,6 +221,8 @@
 				0A000001000000000000000A /* Views/ViewModifiers.swift in Sources */,
 				0A000001000000000000000D /* Models/NotificationManager.swift in Sources */,
 				0A000001000000000000000E /* Models/BackgroundRefreshCoordinator.swift in Sources */,
+				0A0000010000000000000010 /* Views/SleepAnalysisView.swift in Sources */,
+				0A0000010000000000000011 /* Views/OnboardingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
