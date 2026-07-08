@@ -34,6 +34,7 @@ struct HistoryView: View {
                         HistoryRow(record: record)
                     }
                 }
+                AppSafetyFooter()
             }
             .padding(16)
         }

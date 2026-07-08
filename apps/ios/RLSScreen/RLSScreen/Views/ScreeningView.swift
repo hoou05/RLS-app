@@ -6,51 +6,55 @@ struct ScreeningView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    if let baseline = store.baselineResult {
-                        BaselineSummaryPanel(baseline: baseline)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 16) {
+                        ScreeningHeroView(score: currentRiskScore)
+                            .id("screen-top")
+
+                        if let baseline = store.baselineResult {
+                            BaselineSummaryPanel(baseline: baseline)
+                        }
+
+                        HealthImportView()
+
+                        if let message = store.healthImportMessage {
+                            Text(message)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        if let error = store.errorMessage {
+                            Text(error)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        InputSectionView(form: $store.form, focusedField: $focusedField)
+
+                        Button {
+                            focusedField = nil
+                            store.runScreening()
+                            withAnimation(.snappy) {
+                                proxy.scrollTo("screen-top", anchor: .top)
+                            }
+                        } label: {
+                            Label("Run Screening", systemImage: "play.circle.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(RestlegTheme.navy)
+                        .controlSize(.large)
+
+                        AppSafetyFooter()
                     }
-
-                    if let record = store.latestTier2 {
-                        ResultSummaryView(record: record)
-                    } else {
-                        EmptyResultView()
-                    }
-
-                    HealthImportView()
-
-                    if let message = store.healthImportMessage {
-                        Text(message)
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    if let error = store.errorMessage {
-                        Text(error)
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.red)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    InputSectionView(form: $store.form, focusedField: $focusedField)
-
-                    Button {
-                        focusedField = nil
-                        store.runScreening()
-                    } label: {
-                        Label("Run Screening", systemImage: "play.circle.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(RestlegTheme.green)
-                    .controlSize(.large)
+                    .padding(16)
                 }
-                .padding(16)
             }
             .restlegBackground()
-            .navigationTitle("Restleg")
+            .toolbar(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -60,6 +64,14 @@ struct ScreeningView: View {
                 }
             }
         }
+    }
+
+    private var currentRiskScore: Double? {
+        latestRecord?.riskScore ?? store.baselineResult?.typicalScore
+    }
+
+    private var latestRecord: ScreeningRecord? {
+        store.latestTier2 ?? store.latestTier1
     }
 }
 
@@ -105,10 +117,6 @@ private struct BaselineSummaryPanel: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-
-            Text("Baseline uses the questionnaire plus each available sleep session. Screening only, not a diagnosis.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
         .panelStyle()
     }
@@ -149,91 +157,6 @@ private struct HealthImportView: View {
     }
 }
 
-private struct EmptyResultView: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("No screening result", systemImage: "waveform.path.ecg")
-                .font(.headline)
-            Text("Screening only. This app does not diagnose RLS or determine whether you have RLS.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .panelStyle()
-    }
-}
-
-private struct ResultSummaryView: View {
-    let record: ScreeningRecord
-
-    private var level: RiskLevel {
-        RiskLevel(score: record.riskScore)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(level.title)
-                        .font(.system(size: 34, weight: .bold))
-                    Text(record.modelLabel)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Text(record.riskScore, format: .percent.precision(.fractionLength(1)))
-                    .font(.system(size: 34, weight: .bold))
-                    .monospacedDigit()
-            }
-
-            ProgressView(value: record.riskScore)
-                .tint(color(for: level))
-
-            HStack(spacing: 10) {
-                MetricPill(title: "XGBoost", value: record.xgboostProbability)
-                MetricPill(title: "TabM", value: record.tabmProbability)
-            }
-
-            if let coverage = record.coverageLabel {
-                Label(coverage, systemImage: "checklist.checked")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-
-            Text("Screening only. Consult a clinician if symptoms persist or concern you.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .panelStyle()
-    }
-
-    private func color(for level: RiskLevel) -> Color {
-        switch level {
-        case .low:
-            return RestlegTheme.green
-        case .moderate:
-            return .orange
-        case .high:
-            return .red
-        }
-    }
-}
-
-private extension ScreeningRecord {
-    var modelLabel: String {
-        if let modelKey {
-            return "Auto model: \(modelKey)"
-        }
-        return scenario
-    }
-
-    var coverageLabel: String? {
-        guard let availableFeatureCount, let totalFeatureCount, totalFeatureCount > 0 else {
-            return nil
-        }
-        return "\(availableFeatureCount) of \(totalFeatureCount) model features available"
-    }
-}
-
 private struct MetricPill: View {
     let title: String
     let value: String
@@ -256,5 +179,110 @@ private extension MetricPill {
     init(title: String, value: Double) {
         self.title = title
         self.value = value.formatted(.percent.precision(.fractionLength(1)))
+    }
+}
+
+private struct ScreeningHeroView: View {
+    let score: Double?
+
+    private var levelTitle: String {
+        guard let score else { return "Risk" }
+        return RiskLevel(score: score).title
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Restleg")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(RestlegTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                Text(score == nil ? "Run screening to update your score." : "Latest screening score.")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HeroRiskDial(score: score, title: levelTitle, subtitle: score == nil ? "Baseline needed" : "Current")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        LinearGradient(
+                            colors: [RestlegTheme.panelTint, .white.opacity(0.96)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                VStack(spacing: 12) {
+                    Capsule()
+                        .fill(RestlegTheme.sky.opacity(0.46))
+                        .frame(width: 180, height: 8)
+                    Capsule()
+                        .fill(RestlegTheme.teal.opacity(0.18))
+                        .frame(width: 130, height: 8)
+                }
+                .rotationEffect(.degrees(-18))
+                .offset(x: 74, y: 42)
+            }
+        }
+    }
+}
+
+private struct HeroRiskDial: View {
+    let score: Double?
+    let title: String
+    let subtitle: String
+
+    private var progress: Double {
+        min(max(score ?? 0, 0), 1)
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [RestlegTheme.sky, RestlegTheme.blue, RestlegTheme.navy],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: RestlegTheme.navy.opacity(0.22), radius: 18, x: 0, y: 10)
+
+            Circle()
+                .stroke(RestlegTheme.sky.opacity(0.55), lineWidth: 10)
+                .padding(5)
+
+            Circle()
+                .stroke(Color.white.opacity(0.28), lineWidth: 7)
+                .padding(18)
+
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(Color.white, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .padding(18)
+
+            VStack(spacing: 2) {
+                Text(score.map { $0.formatted(.percent.precision(.fractionLength(1))) } ?? "--")
+                    .font(.system(size: 25, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.74)
+                Text(title)
+                    .font(.caption.weight(.bold))
+                Text(subtitle)
+                    .font(.caption2)
+                    .opacity(0.8)
+            }
+            .foregroundStyle(.white)
+        }
+        .frame(width: 142, height: 142)
+        .accessibilityLabel("Risk score")
     }
 }
