@@ -51,7 +51,12 @@ struct ScreeningView: View {
                         AppSafetyFooter()
                     }
                     .padding(16)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        focusedField = nil
+                    }
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .restlegBackground()
             .toolbar(.hidden, for: .navigationBar)
@@ -86,7 +91,7 @@ private struct BaselineSummaryPanel: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("60-day baseline")
+                    Text("60-day average risk")
                         .font(.headline)
                     Text(level.title)
                         .font(.system(size: 34, weight: .bold))
@@ -107,7 +112,7 @@ private struct BaselineSummaryPanel: View {
             }
 
             if let meanScore = baseline.meanScore, let p75Score = baseline.p75Score {
-                Text("Mean \(meanScore, format: .percent.precision(.fractionLength(1))) / P75 \(p75Score, format: .percent.precision(.fractionLength(1)))")
+                Text("Average risk \(meanScore, format: .percent.precision(.fractionLength(1))) / Higher-risk threshold \(p75Score, format: .percent.precision(.fractionLength(1)))")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
@@ -214,7 +219,7 @@ private struct ScreeningHeroView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(
                         LinearGradient(
-                            colors: [RestlegTheme.panelTint, .white.opacity(0.96)],
+                            colors: [RestlegTheme.panelTint, RestlegTheme.softHighlight],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )

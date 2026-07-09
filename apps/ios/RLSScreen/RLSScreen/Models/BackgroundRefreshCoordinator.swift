@@ -3,7 +3,7 @@ import Foundation
 
 final class BackgroundRefreshCoordinator {
     static let shared = BackgroundRefreshCoordinator()
-    static let refreshIdentifier = "local.rls.screen.refresh"
+    static let refreshIdentifier = "com.hoou05.restleg.screen.refresh"
 
     private var isRegistered = false
     private var refreshHandler: (() async -> Void)?

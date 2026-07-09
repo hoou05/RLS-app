@@ -72,6 +72,15 @@ struct ScreeningForm: Codable, Equatable {
         copy.nonLegSymptoms = source.nonLegSymptoms
         return copy
     }
+
+    func withoutQuestionnaire() -> ScreeningForm {
+        var copy = self
+        copy.familyHistoryRLS = nil
+        copy.diabetes = nil
+        copy.psychiatricMedication = nil
+        copy.nonLegSymptoms = nil
+        return copy
+    }
 }
 
 struct ScreeningRecord: Codable, Identifiable, Equatable {

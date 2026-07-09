@@ -21,9 +21,9 @@ struct SleepAnalysisView: View {
                     .padding(.top, 80)
                 } else {
                     TrendSummaryPanel(analysis: analysis)
-                    TrendOverviewPanel(analysis: analysis)
                     SleepDurationChart(analysis: analysis)
                     RiskScoreChart(analysis: analysis)
+                    TrendOverviewPanel(analysis: analysis)
                     SleepStagesPanel(analysis: analysis)
                     InsightPanel(insights: analysis.insights)
                 }
@@ -43,32 +43,49 @@ private struct TrendSummaryPanel: View {
                 .font(.headline)
                 .foregroundStyle(RestlegTheme.ink)
 
-            Text(summary)
-                .font(.subheadline)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+            if summaryItems.isEmpty {
+                Text("Trend data is present, but key sleep metrics are still limited. Continue collecting a few more nights for a clearer pattern.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(summaryItems, id: \.self) { item in
+                        HStack(alignment: .top, spacing: 10) {
+                            Circle()
+                                .fill(RestlegTheme.blue.opacity(0.82))
+                                .frame(width: 6, height: 6)
+                                .padding(.top, 7)
+                            Text(item)
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
         }
         .panelStyle()
     }
 
-    private var summary: String {
+    private var summaryItems: [String] {
         var parts: [String] = []
         if let avg = analysis.averageSleepDurationMinutes {
             parts.append("Recent records average \(SleepTrendAnalysis.formatDuration(minutes: avg)) of sleep.")
         }
         if let efficiency = analysis.averageSleepEfficiency {
-            parts.append("Average efficiency is \(efficiency.formatted(.number.precision(.fractionLength(0))))%.")
+            parts.append("Average sleep efficiency is \(efficiency.formatted(.number.precision(.fractionLength(0))))%.")
         }
         if let change = analysis.sleepDurationChangeMinutes {
             parts.append("Sleep duration is \(SleepTrendAnalysis.formatSignedMinutes(change)) versus prior records.")
         }
         if analysis.shortSleepNightCount > 0 {
-            parts.append("\(analysis.shortSleepNightCount) recent night(s) were short-sleep nights.")
+            parts.append("\(analysis.shortSleepNightCount) recent night(s) had shorter-than-target sleep duration.")
         }
         if analysis.lowEfficiencyNightCount > 0 {
-            parts.append("\(analysis.lowEfficiencyNightCount) recent night(s) had lower sleep efficiency.")
+            parts.append("\(analysis.lowEfficiencyNightCount) recent night(s) had reduced sleep efficiency.")
         }
-        return parts.isEmpty ? "Trend data is present, but key sleep metrics are still limited. Continue collecting a few more nights for a clearer pattern." : parts.joined(separator: " ")
+        return parts
     }
 }
 
@@ -89,12 +106,12 @@ private struct TrendOverviewPanel: View {
                 TrendMetricTile(
                     title: "Efficiency",
                     value: analysis.averageSleepEfficiency.map { $0.formatted(.number.precision(.fractionLength(0))) + "%" } ?? "No data",
-                    footnote: "\(analysis.lowEfficiencyNightCount) low-efficiency nights"
+                    footnote: "\(analysis.lowEfficiencyNightCount) night(s) below efficiency target"
                 )
                 TrendMetricTile(
                     title: "Risk",
                     value: analysis.averageRiskScore.map { $0.formatted(.percent.precision(.fractionLength(1))) } ?? "No data",
-                    footnote: "\(analysis.highRiskNightCount) high-band screenings"
+                    footnote: "\(analysis.highRiskNightCount) screening(s) in higher risk range"
                 )
                 TrendMetricTile(
                     title: "Bedtime Range",

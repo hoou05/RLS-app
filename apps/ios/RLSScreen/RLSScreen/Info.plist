@@ -4,12 +4,12 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>local.rls.screen.refresh</string>
+		<string>com.hoou05.restleg.screen.refresh</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>RLS Screen</string>
+	<string>RestLeg</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -29,7 +29,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>RLS Screen reads sleep stages, heart rate, blood oxygen, height, weight, age, and sex from Health to fill local screening inputs.</string>
+	<string>RestLeg reads sleep stages, heart rate, blood oxygen, height, weight, age, and sex from Health to fill local screening inputs.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

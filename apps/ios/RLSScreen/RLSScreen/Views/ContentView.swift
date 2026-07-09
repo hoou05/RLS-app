@@ -25,7 +25,7 @@ struct ContentView: View {
 
             SleepHubView()
                 .tabItem {
-                    Label("Sleep", systemImage: "chart.line.uptrend.xyaxis")
+                    Label("Data", systemImage: "chart.line.uptrend.xyaxis")
                 }
         }
         .tint(RestlegTheme.green)
@@ -61,7 +61,7 @@ private struct SleepHubView: View {
                 }
             }
             .restlegBackground()
-            .navigationTitle("Sleep")
+            .navigationTitle("Data")
         }
     }
 }
@@ -119,7 +119,12 @@ struct AgentView: View {
                             }
                         }
                         .padding(16)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            isComposerFocused = false
+                        }
                     }
+                    .scrollDismissesKeyboard(.interactively)
                     .onChange(of: messages.count) {
                         scrollToBottom(reader)
                     }
@@ -166,12 +171,6 @@ struct AgentView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Picker("Mode", selection: $selectedMode) {
-                Text("Question").tag(SleepAgentMode.question)
-                Text("Trend").tag(SleepAgentMode.trend)
-                Text("Guide").tag(SleepAgentMode.guide)
-            }
-            .pickerStyle(.segmented)
         }
     }
 
@@ -187,6 +186,7 @@ struct AgentView: View {
                 TextField("Ask a follow-up...", text: $draft, axis: .vertical)
                     .lineLimit(1...5)
                     .focused($isComposerFocused)
+                    .submitLabel(.send)
                     .textInputAutocapitalization(.sentences)
                     .autocorrectionDisabled(false)
                     .font(.body)
@@ -233,6 +233,7 @@ struct AgentView: View {
             return
         }
 
+        isComposerFocused = false
         errorMessage = nil
         let mode = selectedMode
         let priorMessages = messages

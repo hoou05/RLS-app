@@ -35,7 +35,7 @@ struct OnboardingView: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(
                                     LinearGradient(
-                                        colors: [RestlegTheme.panelTint, .white.opacity(0.96)],
+                                        colors: [RestlegTheme.panelTint, RestlegTheme.softHighlight],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )

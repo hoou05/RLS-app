@@ -46,7 +46,7 @@ final class ScreeningStore: ObservableObject {
             latestTier1 = history.first
             latestTier2 = history.first
             if let latestForm = history.first?.input {
-                form = latestForm
+                form = Self.isDemoDataset(history) ? latestForm.withoutQuestionnaire() : latestForm
             }
         }
     }
@@ -91,8 +91,6 @@ final class ScreeningStore: ObservableObject {
     func buildBaselineScreening() async {
         errorMessage = nil
         healthImportMessage = nil
-
-        applyDirectImportQuestionnaireDefaultsIfNeeded()
 
         guard let engine else {
             errorMessage = ScreeningStoreError.modelBundleUnavailable.localizedDescription
@@ -325,7 +323,7 @@ final class ScreeningStore: ObservableObject {
             latestTier1 = history.first
             latestTier2 = history.first
             if let latestForm = history.first?.input {
-                form = latestForm
+                form = latestForm.withoutQuestionnaire()
             }
             saveHistory()
             saveBaseline()
@@ -403,19 +401,14 @@ final class ScreeningStore: ObservableObject {
             }
     }
 
-    private func applyDirectImportQuestionnaireDefaultsIfNeeded() {
-        if form.familyHistoryRLS == nil {
-            form.familyHistoryRLS = false
-        }
-        if form.diabetes == nil {
-            form.diabetes = false
-        }
-        if form.psychiatricMedication == nil {
-            form.psychiatricMedication = false
-        }
-        if form.nonLegSymptoms == nil {
-            form.nonLegSymptoms = false
-        }
+    private static func isDemoDataset(_ history: [ScreeningRecord]) -> Bool {
+        !history.isEmpty
+            && history.allSatisfy { record in
+                record.input.age == 51
+                    && record.input.sex == "female"
+                    && record.input.heightCm == 165
+                    && record.input.weightKg == 62
+            }
     }
 }
 

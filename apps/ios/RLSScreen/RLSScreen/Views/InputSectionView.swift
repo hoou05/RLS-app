@@ -115,52 +115,31 @@ struct InputSectionView: View {
                         field: .minimumSpO2,
                         focusedField: focusedField
                     )
-                    OptionalNumberField(
-                        title: "Core/N1N2",
-                        unit: "min",
+                    SleepStageFieldPair(
+                        title: "N1N2",
                         help: "Apple Core or unspecified sleep mapped to the model's N1N2 sleep feature.",
-                        value: $form.lightSleepMinutes,
-                        field: .lightSleepMinutes,
+                        minuteValue: $form.lightSleepMinutes,
+                        percentValue: $form.lightSleepPercent,
+                        minuteField: .lightSleepMinutes,
+                        percentField: .lightSleepPercent,
                         focusedField: focusedField
                     )
-                    OptionalNumberField(
-                        title: "Core/N1N2",
-                        unit: "%",
-                        help: "Share of total sleep spent in Apple Core or unspecified sleep.",
-                        value: $form.lightSleepPercent,
-                        field: .lightSleepPercent,
-                        focusedField: focusedField
-                    )
-                    OptionalNumberField(
-                        title: "Deep/N3",
-                        unit: "min",
+                    SleepStageFieldPair(
+                        title: "N3",
                         help: "Apple Deep sleep mapped to the model's N3 sleep feature.",
-                        value: $form.deepSleepMinutes,
-                        field: .deepSleepMinutes,
+                        minuteValue: $form.deepSleepMinutes,
+                        percentValue: $form.deepSleepPercent,
+                        minuteField: .deepSleepMinutes,
+                        percentField: .deepSleepPercent,
                         focusedField: focusedField
                     )
-                    OptionalNumberField(
-                        title: "Deep/N3",
-                        unit: "%",
-                        help: "Share of total sleep spent in Apple Deep sleep.",
-                        value: $form.deepSleepPercent,
-                        field: .deepSleepPercent,
-                        focusedField: focusedField
-                    )
-                    OptionalNumberField(
-                        title: "REM/R",
-                        unit: "min",
-                        help: "Apple REM sleep mapped to the model's R-stage feature.",
-                        value: $form.remSleepMinutes,
-                        field: .remSleepMinutes,
-                        focusedField: focusedField
-                    )
-                    OptionalNumberField(
-                        title: "REM/R",
-                        unit: "%",
-                        help: "Share of total sleep spent in Apple REM sleep.",
-                        value: $form.remSleepPercent,
-                        field: .remSleepPercent,
+                    SleepStageFieldPair(
+                        title: "REM",
+                        help: "Apple REM sleep mapped to the model's REM sleep feature.",
+                        minuteValue: $form.remSleepMinutes,
+                        percentValue: $form.remSleepPercent,
+                        minuteField: .remSleepMinutes,
+                        percentField: .remSleepPercent,
                         focusedField: focusedField
                     )
                 }
@@ -256,6 +235,85 @@ private struct InputPanel<Content: View>: View {
     }
 }
 
+private struct SleepStageFieldPair: View {
+    let title: String
+    let help: String
+    @Binding var minuteValue: Double?
+    @Binding var percentValue: Double?
+    let minuteField: Field
+    let percentField: Field
+    var focusedField: FocusState<Field?>.Binding
+
+    var body: some View {
+        HStack(alignment: .top) {
+            FieldTitle(title: title, help: help)
+                .padding(.top, 8)
+            Spacer()
+            VStack(spacing: 8) {
+                CompactOptionalNumberField(
+                    unit: "min",
+                    value: $minuteValue,
+                    field: minuteField,
+                    focusedField: focusedField
+                )
+                CompactOptionalNumberField(
+                    unit: "%",
+                    value: $percentValue,
+                    field: percentField,
+                    focusedField: focusedField
+                )
+            }
+        }
+    }
+}
+
+private struct CompactOptionalNumberField: View {
+    let unit: String
+    @Binding var value: Double?
+    let field: Field
+    var focusedField: FocusState<Field?>.Binding
+
+    var body: some View {
+        HStack(spacing: 10) {
+            TextField("Missing", text: textBinding)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .focused(focusedField, equals: field)
+                .submitLabel(.done)
+                .onSubmit {
+                    focusedField.wrappedValue = nil
+                }
+                .frame(width: 88)
+                .padding(.vertical, 7)
+                .padding(.horizontal, 10)
+                .background(RestlegTheme.field, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(RestlegTheme.border.opacity(0.9), lineWidth: 1)
+                )
+            Text(unit)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 36, alignment: .leading)
+        }
+    }
+
+    private var textBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let value else {
+                    return ""
+                }
+                return value.formatted(.number.precision(.fractionLength(0...1)))
+            },
+            set: { newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                value = trimmed.isEmpty ? nil : Double(trimmed)
+            }
+        )
+    }
+}
+
 private struct NumberField: View {
     let title: String
     let unit: String
@@ -272,10 +330,14 @@ private struct NumberField: View {
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .focused(focusedField, equals: field)
+                .submitLabel(.done)
+                .onSubmit {
+                    focusedField.wrappedValue = nil
+                }
                 .frame(width: 88)
                 .padding(.vertical, 7)
                 .padding(.horizontal, 10)
-                .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                .background(RestlegTheme.field, in: RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(RestlegTheme.border.opacity(0.9), lineWidth: 1)
@@ -304,10 +366,14 @@ private struct OptionalNumberField: View {
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .focused(focusedField, equals: field)
+                .submitLabel(.done)
+                .onSubmit {
+                    focusedField.wrappedValue = nil
+                }
                 .frame(width: 88)
                 .padding(.vertical, 7)
                 .padding(.horizontal, 10)
-                .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                .background(RestlegTheme.field, in: RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(RestlegTheme.border.opacity(0.9), lineWidth: 1)

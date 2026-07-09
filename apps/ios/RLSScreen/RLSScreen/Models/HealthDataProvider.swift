@@ -46,7 +46,7 @@ enum HealthDataProviderError: LocalizedError {
         case .unavailable:
             return "Health data is not available on this device."
         case .missingReadableData:
-            return "No Health data could be read. If permissions were turned off, re-enable RLS Screen in Health permissions, then try again."
+            return "No Health data could be read. If permissions were turned off, re-enable RestLeg in Health permissions, then try again."
         }
     }
 }

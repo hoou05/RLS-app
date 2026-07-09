@@ -1,17 +1,38 @@
 import SwiftUI
 
 enum RestlegTheme {
-    static let ink = Color(red: 0.02, green: 0.14, blue: 0.28)
+    static let ink = Color(.label)
     static let navy = Color(red: 0.02, green: 0.18, blue: 0.35)
     static let blue = Color(red: 0.07, green: 0.48, blue: 0.70)
     static let sky = Color(red: 0.69, green: 0.93, blue: 1.00)
     static let teal = Color(red: 0.11, green: 0.75, blue: 0.82)
     static let mint = Color(red: 0.74, green: 0.96, blue: 0.92)
     static let green = blue
-    static let background = Color(red: 0.93, green: 0.98, blue: 1.00)
-    static let panel = Color.white
-    static let panelTint = Color(red: 0.88, green: 0.97, blue: 1.00)
-    static let border = Color(red: 0.70, green: 0.86, blue: 0.94)
+    static let background = Color(.systemBackground)
+    static let backgroundTint = Color(.secondarySystemBackground)
+    static let panel = Color(.secondarySystemGroupedBackground)
+    static let field = Color(.tertiarySystemGroupedBackground)
+    static let panelTint = Color(
+        UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.05, green: 0.18, blue: 0.25, alpha: 1)
+                : UIColor(red: 0.88, green: 0.97, blue: 1.00, alpha: 1)
+        }
+    )
+    static let border = Color(
+        UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.22, green: 0.45, blue: 0.56, alpha: 1)
+                : UIColor(red: 0.70, green: 0.86, blue: 0.94, alpha: 1)
+        }
+    )
+    static let softHighlight = Color(
+        UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.07, green: 0.28, blue: 0.36, alpha: 1)
+                : UIColor.white.withAlphaComponent(0.96)
+        }
+    )
 }
 
 extension View {
@@ -32,8 +53,8 @@ extension View {
             LinearGradient(
                 colors: [
                     RestlegTheme.background,
-                    Color(red: 0.86, green: 0.96, blue: 1.00),
-                    Color(red: 0.98, green: 0.99, blue: 1.00),
+                    RestlegTheme.panelTint,
+                    RestlegTheme.backgroundTint,
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

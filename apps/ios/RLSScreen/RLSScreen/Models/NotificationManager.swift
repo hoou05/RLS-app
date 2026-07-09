@@ -22,7 +22,7 @@ final class NotificationManager {
 
         let content = UNMutableNotificationContent()
         content.title = "Sleep screening updated"
-        content.body = "New sleep data was analyzed. Open RLS Screen to review the result."
+        content.body = "New sleep data was analyzed. Open RestLeg to review the result."
         content.sound = .default
         content.badge = 1
         content.userInfo = [
